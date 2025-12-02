@@ -76,20 +76,44 @@
       background: #dc3545;
       color: white;
     }
-    .btn-plus:hover {
-      background: #218838;
-    }
-    .btn-minus:hover {
-      background: #c82333;
-    }
-    .display-row {
-      font-size: 1.4em;
+    .btn-plus:hover { background: #218838; }
+    .btn-minus:hover { background: #c82333; }
+
+    /* Pendaftaran */
+    .call-row {
       margin: 12px 0;
-      padding: 8px;
-      background: #eef5ff;
+      padding: 12px;
+      background: #f0f8ff;
+      border-radius: 8px;
       border-left: 4px solid #0056b3;
     }
-    button {
+    .call-header {
+      font-weight: bold;
+      font-size: 1.2em;
+      color: #0056b3;
+    }
+    .call-info {
+      margin: 6px 0;
+      font-size: 1em;
+    }
+    .btn-call {
+      padding: 8px 16px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 1.1em;
+    }
+    .btn-call:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .btn-call:hover:not(:disabled) {
+      background: #0056b3;
+    }
+
+    button.reset-btn {
       padding: 10px 15px;
       background: #d9534f;
       color: white;
@@ -98,7 +122,7 @@
       cursor: pointer;
       margin-top: 10px;
     }
-    button:hover {
+    button.reset-btn:hover {
       background: #c9302c;
     }
     .footer {
@@ -116,52 +140,52 @@
     <button class="tab-btn" data-tab="tab2">Pendaftaran</button>
   </div>
 
-  <!-- Tab 1: Input Antrian -->
+  <!-- Tab 1: Input Total Antrian -->
   <div id="tab1" class="tab-content active">
     <h2>Pembagian Antrian (A–E)</h2>
     <div class="counter">
       <span class="counter-label">A:</span>
-      <span class="counter-value" id="value-A">0</span>
+      <span class="counter-value" id="total-A">0</span>
       <button class="btn-plus" data-letter="A">+</button>
       <button class="btn-minus" data-letter="A">-</button>
     </div>
     <div class="counter">
       <span class="counter-label">B:</span>
-      <span class="counter-value" id="value-B">0</span>
+      <span class="counter-value" id="total-B">0</span>
       <button class="btn-plus" data-letter="B">+</button>
       <button class="btn-minus" data-letter="B">-</button>
     </div>
     <div class="counter">
       <span class="counter-label">C:</span>
-      <span class="counter-value" id="value-C">0</span>
+      <span class="counter-value" id="total-C">0</span>
       <button class="btn-plus" data-letter="C">+</button>
       <button class="btn-minus" data-letter="C">-</button>
     </div>
     <div class="counter">
       <span class="counter-label">D:</span>
-      <span class="counter-value" id="value-D">0</span>
+      <span class="counter-value" id="total-D">0</span>
       <button class="btn-plus" data-letter="D">+</button>
       <button class="btn-minus" data-letter="D">-</button>
     </div>
     <div class="counter">
       <span class="counter-label">E:</span>
-      <span class="counter-value" id="value-E">0</span>
+      <span class="counter-value" id="total-E">0</span>
       <button class="btn-plus" data-letter="E">+</button>
       <button class="btn-minus" data-letter="E">-</button>
     </div>
-    <button id="reset-btn">Reset Hari Ini</button>
-    <div class="footer">Perubahan langsung tersimpan & terlihat di tab Pendaftaran</div>
+    <button class="reset-btn" id="reset-btn">Reset Hari Ini</button>
+    <div class="footer">Total antrian yang dibagikan (misal: A=7 → antrian A1 sampai A7)</div>
   </div>
 
-  <!-- Tab 2: Tampilan Pendaftaran -->
+  <!-- Tab 2: Pemanggilan Per Nomor -->
   <div id="tab2" class="tab-content">
-    <h2>Pendaftaran – Antrian Hari Ini</h2>
-    <div id="display-A" class="display-row">A: 0</div>
-    <div id="display-B" class="display-row">B: 0</div>
-    <div id="display-C" class="display-row">C: 0</div>
-    <div id="display-D" class="display-row">D: 0</div>
-    <div id="display-E" class="display-row">E: 0</div>
-    <div class="footer">Update otomatis – tidak perlu refresh</div>
+    <h2>Pendaftaran – Panggil Antrian</h2>
+    <div id="call-A" class="call-row"></div>
+    <div id="call-B" class="call-row"></div>
+    <div id="call-C" class="call-row"></div>
+    <div id="call-D" class="call-row"></div>
+    <div id="call-E" class="call-row"></div>
+    <div class="footer">Klik “Panggil” untuk lanjut ke nomor berikutnya</div>
   </div>
 
   <!-- Firebase SDK -->
@@ -180,35 +204,33 @@
       appId: "1:992002959684:web:ec82ecb075c71927504f11"
     };
 
-    // Inisialisasi Firebase
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
     const ref = database.ref('antrian_hari_ini');
 
-    // === SISTEM RESET HARIAN ===
+    // === RESET HARIAN ===
     function isSameDay(timestamp) {
       const now = new Date();
       const stored = new Date(timestamp);
-      return (
-        now.getFullYear() === stored.getFullYear() &&
-        now.getMonth() === stored.getMonth() &&
-        now.getDate() === stored.getDate()
-      );
+      return now.getFullYear() === stored.getFullYear() &&
+             now.getMonth() === stored.getMonth() &&
+             now.getDate() === stored.getDate();
     }
 
-    // Cek & reset otomatis jika hari berbeda
     function checkAndResetIfNeeded() {
       ref.once('value').then(snapshot => {
-        const data = snapshot.val();
-        const lastReset = data?.lastReset || 0;
+        const data = snapshot.val() || {};
+        const lastReset = data.lastReset || 0;
         if (!isSameDay(lastReset)) {
-          const resetData = { A: 0, B: 0, C: 0, D: 0, E: 0, lastReset: Date.now() };
+          const resetData = {};
+          ['A','B','C','D','E'].forEach(letter => {
+            resetData[letter] = { total: 0, current: 0 };
+          });
+          resetData.lastReset = Date.now();
           ref.set(resetData);
         }
       });
     }
-
-    // Jalankan cek saat halaman dibuka
     checkAndResetIfNeeded();
 
     // === TAB SWITCHING ===
@@ -217,46 +239,78 @@
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         btn.classList.add('active');
-        const tabId = btn.getAttribute('data-tab');
-        document.getElementById(tabId).classList.add('active');
+        document.getElementById(btn.getAttribute('data-tab')).classList.add('active');
       });
     });
 
-    // === TOMBOL + DAN - ===
+    // === PEMBAGIAN ANTRIAN (UPDATE TOTAL) ===
     document.querySelectorAll('.btn-plus, .btn-minus').forEach(btn => {
       btn.addEventListener('click', () => {
         const letter = btn.getAttribute('data-letter');
-        const valueEl = document.getElementById(`value-${letter}`);
-        let currentValue = parseInt(valueEl.textContent) || 0;
-
-        if (btn.classList.contains('btn-plus')) {
-          currentValue++;
-        } else if (btn.classList.contains('btn-minus') && currentValue > 0) {
-          currentValue--;
-        }
-
-        valueEl.textContent = currentValue;
-        ref.child(letter).set(currentValue);
+        const el = document.getElementById(`total-${letter}`);
+        let val = parseInt(el.textContent) || 0;
+        if (btn.classList.contains('btn-plus')) val++;
+        else if (btn.classList.contains('btn-minus') && val > 0) val--;
+        el.textContent = val;
+        ref.child(`${letter}/total`).set(val);
       });
     });
 
-    // Reset manual
+    // === PENDAFTARAN: UPDATE TAMPILAN & TOMBOL PANGGIL ===
+    function renderCallSection(letter, total, current) {
+      const container = document.getElementById(`call-${letter}`);
+      let html = '';
+      if (total === 0) {
+        html = `<div class="call-header">${letter}: Tidak ada antrian</div>`;
+      } else {
+        const next = current + 1;
+        const status = current === 0 ? 
+          `Belum mulai` : 
+          `Terakhir dipanggil: ${letter}${current}`;
+        const nextText = next <= total ? `Panggil ${letter}${next}` : "Selesai";
+        const disabled = next > total ? 'disabled' : '';
+        
+        html = `
+          <div class="call-header">${letter}: ${total} antrian (1–${total})</div>
+          <div class="call-info">${status}</div>
+          <button class="btn-call" data-letter="${letter}" ${disabled}>${nextText}</button>
+        `;
+      }
+      container.innerHTML = html;
+    }
+
+    // === TOMBOL "PANGGIL BERIKUTNYA" ===
+    document.getElementById('tab2').addEventListener('click', (e) => {
+      if (e.target.classList.contains('btn-call')) {
+        const letter = e.target.getAttribute('data-letter');
+        ref.child(`${letter}/current`).transaction(current => {
+          return (current || 0) + 1;
+        });
+      }
+    });
+
+    // === RESET MANUAL ===
     document.getElementById('reset-btn').addEventListener('click', () => {
       if (confirm('Yakin reset semua antrian hari ini?')) {
-        const resetData = { A: 0, B: 0, C: 0, D: 0, E: 0, lastReset: Date.now() };
+        const resetData = {};
+        ['A','B','C','D','E'].forEach(letter => {
+          resetData[letter] = { total: 0, current: 0 };
+        });
+        resetData.lastReset = Date.now();
         ref.set(resetData);
       }
     });
 
-    // === TAMPILKAN REAL-TIME (Tab 2) ===
+    // === REAL-TIME UPDATE ===
     ref.on('value', snapshot => {
       const data = snapshot.val() || {};
       ['A','B','C','D','E'].forEach(letter => {
-        const displayEl = document.getElementById(`display-${letter}`);
-        const valueEl = document.getElementById(`value-${letter}`);
-        const value = data[letter] || 0;
-        if (displayEl) displayEl.textContent = `${letter}: ${value}`;
-        if (valueEl) valueEl.textContent = value;
+        const totalEl = document.getElementById(`total-${letter}`);
+        const total = (data[letter]?.total) || 0;
+        const current = (data[letter]?.current) || 0;
+
+        if (totalEl) totalEl.textContent = total;
+        renderCallSection(letter, total, current);
       });
     });
   </script>
