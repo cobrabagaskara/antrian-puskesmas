@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Antrian Puskesmas</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 15px;
+      background: #f9f9f9;
+    }
+    h1 { text-align: center; color: #0056b3; }
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .tab-btn {
+      padding: 10px 20px;
+      border: none;
+      background: #ddd;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+    .tab-btn.active {
+      background: #0056b3;
+      color: white;
+    }
+    .tab-content {
+      display: none;
+      padding: 15px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .counter {
+      margin: 10px 0;
+    }
+    input[type="number"] {
+      width: 80px;
+      padding: 8px;
+      font-size: 1.2em;
+      text-align: center;
+    }
+    .display-row {
+      font-size: 1.4em;
+      margin: 12px 0;
+      padding: 8px;
+      background: #eef5ff;
+      border-left: 4px solid #0056b3;
+    }
+    button {
+      padding: 10px 15px;
+      background: #d9534f;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    button:hover {
+      background: #c9302c;
+    }
+    .footer {
+      margin-top: 20px;
+      text-align: center;
+      font-size: 0.9em;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="tab1">Pembagian Antrian</button>
+    <button class="tab-btn" data-tab="tab2">Pendaftaran</button>
+  </div>
+
+  <!-- Tab 1: Input Antrian -->
+  <div id="tab1" class="tab-content active">
+    <h2>Pembagian Antrian (A–E)</h2>
+    <div class="counter">
+      <label>A: </label>
+      <input type="number" id="input-A" min="0" value="0">
+    </div>
+    <div class="counter">
+      <label>B: </label>
+      <input type="number" id="input-B" min="0" value="0">
+    </div>
+    <div class="counter">
+      <label>C: </label>
+      <input type="number" id="input-C" min="0" value="0">
+    </div>
+    <div class="counter">
+      <label>D: </label>
+      <input type="number" id="input-D" min="0" value="0">
+    </div>
+    <div class="counter">
+      <label>E: </label>
+      <input type="number" id="input-E" min="0" value="0">
+    </div>
+    <button id="reset-btn">Reset Hari Ini</button>
+    <div class="footer">Perubahan langsung tersimpan & terlihat di tab Pendaftaran</div>
+  </div>
+
+  <!-- Tab 2: Tampilan Pendaftaran -->
+  <div id="tab2" class="tab-content">
+    <h2>Pendaftaran – Antrian Hari Ini</h2>
+    <div id="display-A" class="display-row">A: 0</div>
+    <div id="display-B" class="display-row">B: 0</div>
+    <div id="display-C" class="display-row">C: 0</div>
+    <div id="display-D" class="display-row">D: 0</div>
+    <div id="display-E" class="display-row">E: 0</div>
+    <div class="footer">Update otomatis – tidak perlu refresh</div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+  <script>
+    // 🔑 Konfigurasi Firebase (dari kamu)
+    const firebaseConfig = {
+      apiKey: "AIzaSyASLzAtjOgYI2Otko1vMD2Lie8_h3GCUsc",
+      authDomain: "antrian-puskesmas-5869a.firebaseapp.com",
+      databaseURL: "https://antrian-puskesmas-5869a-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "antrian-puskesmas-5869a",
+      storageBucket: "antrian-puskesmas-5869a.firebasestorage.app",
+      messagingSenderId: "992002959684",
+      appId: "1:992002959684:web:ec82ecb075c71927504f11"
+    };
+
+    // Inisialisasi Firebase
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    const ref = database.ref('antrian_hari_ini');
+
+    // === SISTEM RESET HARIAN ===
+    function isSameDay(timestamp) {
+      const now = new Date();
+      const stored = new Date(timestamp);
+      return (
+        now.getFullYear() === stored.getFullYear() &&
+        now.getMonth() === stored.getMonth() &&
+        now.getDate() === stored.getDate()
+      );
+    }
+
+    // Cek & reset otomatis jika hari berbeda
+    function checkAndResetIfNeeded() {
+      ref.once('value').then(snapshot => {
+        const data = snapshot.val();
+        const lastReset = data?.lastReset || 0;
+        if (!isSameDay(lastReset)) {
+          // Reset ke 0 semua
+          const resetData = { A: 0, B: 0, C: 0, D: 0, E: 0, lastReset: Date.now() };
+          ref.set(resetData);
+        }
+      });
+    }
+
+    // Jalankan cek saat halaman dibuka
+    checkAndResetIfNeeded();
+
+    // === TAB SWITCHING ===
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        const tabId = btn.getAttribute('data-tab');
+        document.getElementById(tabId).classList.add('active');
+      });
+    });
+
+    // === INPUT & SIMPAN (Tab 1) ===
+    const inputs = ['A', 'B', 'C', 'D', 'E'];
+    inputs.forEach(letter => {
+      const el = document.getElementById(`input-${letter}`);
+      el.addEventListener('input', () => {
+        const value = parseInt(el.value) || 0;
+        ref.child(letter).set(value);
+      });
+    });
+
+    // Reset manual
+    document.getElementById('reset-btn').addEventListener('click', () => {
+      if (confirm('Yakin reset semua antrian hari ini?')) {
+        const resetData = { A: 0, B: 0, C: 0, D: 0, E: 0, lastReset: Date.now() };
+        ref.set(resetData);
+      }
+    });
+
+    // === TAMPILKAN REAL-TIME (Tab 2) ===
+    ref.on('value', snapshot => {
+      const data = snapshot.val() || {};
+      inputs.forEach(letter => {
+        const displayEl = document.getElementById(`display-${letter}`);
+        const inputEl = document.getElementById(`input-${letter}`);
+        const value = data[letter] || 0;
+        if (displayEl) displayEl.textContent = `${letter}: ${value}`;
+        if (inputEl) inputEl.value = value;
+      });
+    });
+  </script>
+</body>
+</html>
