@@ -4,224 +4,582 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Antrian Puskesmas</title>
-  <link rel="stylesheet" href="style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏥</text></svg>">
+  <style>
+    /* CSS tetap sama seperti sebelumnya */
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f9f9f9;
+    }
+    h1 { text-align: center; color: #0056b3; }
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .tab-btn {
+      padding: 10px 20px;
+      border: none;
+      background: #ddd;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+    .tab-btn.active {
+      background: #0056b3;
+      color: white;
+    }
+    .tab-content {
+      display: none;
+      padding: 15px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .tab-content.active {
+      display: block;
+    }
+
+    .counter-group {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin: 10px 0;
+    }
+    .counter {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .counter-label {
+      font-weight: bold;
+      font-size: 1.2em;
+    }
+    .counter-value {
+      font-size: 1.4em;
+      min-width: 40px;
+      text-align: center;
+      padding: 8px;
+      background: #eef5ff;
+      border-radius: 5px;
+    }
+    .btn-plus, .btn-minus {
+      width: 40px;
+      height: 40px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.5em;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn-plus {
+      background: #28a745;
+      color: white;
+    }
+    .btn-minus {
+      background: #dc3545;
+      color: white;
+    }
+    .btn-plus:hover { background: #218838; }
+    .btn-minus:hover { background: #c82333; }
+
+    .online-input {
+      width: 70px;
+      padding: 6px;
+      font-size: 1em;
+      text-align: center;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .online-label {
+      font-size: 0.9em;
+      color: #666;
+    }
+
+    button.reset-btn {
+      padding: 10px 15px;
+      background: #d9534f;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    button.reset-btn:hover {
+      background: #c9302c;
+    }
+    .footer {
+      margin-top: 20px;
+      text-align: center;
+      font-size: 0.9em;
+      color: #666;
+    }
+
+    .call-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
+    }
+    .call-box {
+      background: #f0f8ff;
+      padding: 15px;
+      border-radius: 8px;
+      border-left: 4px solid #0056b3;
+    }
+    .call-header {
+      font-weight: bold;
+      font-size: 1.2em;
+      color: #0056b3;
+    }
+    .call-info {
+      margin: 6px 0;
+      font-size: 1em;
+    }
+    .btn-call, .btn-confirm {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 1em;
+      margin: 4px 4px 4px 0;
+      display: inline-block;
+    }
+    .btn-call {
+      background: #007bff;
+      color: white;
+    }
+    .btn-call.recall {
+      background: #d9534f;
+    }
+    .btn-confirm.hadir {
+      background: #28a745;
+      color: white;
+    }
+    .btn-confirm.tidak-hadir {
+      background: #dc3545;
+      color: white;
+    }
+    .btn-call:disabled, .btn-confirm:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .btn-call:hover:not(:disabled) { background: #0056b3; }
+    .btn-call.recall:hover:not(:disabled) { background: #c9302c; }
+    .btn-confirm.hadir:hover:not(:disabled) { background: #218838; }
+    .btn-confirm.tidak-hadir:hover:not(:disabled) { background: #c82333; }
+
+    .recall-list {
+      margin-top: 10px;
+    }
+    .recall-item {
+      display: inline-block;
+      margin: 2px;
+      padding: 5px 10px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 0.9em;
+    }
+    .recall-item button {
+      margin-left: 5px;
+      padding: 2px 5px;
+      font-size: 0.8em;
+      background: #d9534f;
+      color: white;
+      border: none;
+      border-radius: 3px;
+    }
+    
+    /* Tambahan untuk confirm box */
+    .confirm-box {
+      margin-top: 10px;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 5px;
+      border: 1px solid #dee2e6;
+    }
+  </style>
 </head>
 <body>
-  <h1>🏥 Sistem Antrian Puskesmas</h1>
-  
+
   <div class="tabs">
-    <button class="tab-btn active" data-tab="tab1">📊 Pembagian Antrian</button>
-    <button class="tab-btn" data-tab="tab2">📢 Pendaftaran & Panggilan</button>
+    <button class="tab-btn active" data-tab="tab1">Pembagian Antrian</button>
+    <button class="tab-btn" data-tab="tab2">Pendaftaran</button>
   </div>
 
-  <!-- Tab 1: Pembagian Antrian -->
   <div id="tab1" class="tab-content active">
     <h2>Pembagian Antrian (A–E)</h2>
-    
     <div class="counter-group">
-      <!-- Counter A -->
       <div class="counter">
         <span class="counter-label">A:</span>
         <span class="counter-value" id="total-A">0</span>
         <button class="btn-plus" data-letter="A">+</button>
         <button class="btn-minus" data-letter="A">-</button>
-        <span class="counter-desc">Umum</span>
       </div>
-      
-      <!-- Counter B -->
       <div class="counter">
         <span class="counter-label">B:</span>
         <span class="counter-value" id="total-B">0</span>
         <button class="btn-plus" data-letter="B">+</button>
         <button class="btn-minus" data-letter="B">-</button>
-        <span class="counter-desc">Anak</span>
       </div>
-      
-      <!-- Counter C -->
       <div class="counter">
         <span class="counter-label">C:</span>
         <span class="counter-value" id="total-C">0</span>
         <button class="btn-plus" data-letter="C">+</button>
         <button class="btn-minus" data-letter="C">-</button>
-        <span class="counter-desc">Gigi</span>
       </div>
-      
-      <!-- Counter D -->
       <div class="counter">
         <span class="counter-label">D:</span>
         <span class="counter-value" id="total-D">0</span>
         <button class="btn-plus" data-letter="D">+</button>
         <button class="btn-minus" data-letter="D">-</button>
-        <span class="counter-desc">KIA</span>
       </div>
-      
-      <!-- Counter E -->
       <div class="counter">
         <span class="counter-label">E:</span>
         <span class="counter-value" id="total-E">0</span>
         <button class="btn-plus" data-letter="E">+</button>
         <button class="btn-minus" data-letter="E">-</button>
-        <div class="online-section">
+        <div style="margin-left: 10px;">
           <div class="online-label">Online:</div>
           <input type="number" class="online-input" id="online-E" min="0" value="0" placeholder="0">
         </div>
-        <span class="counter-desc">Lansia</span>
       </div>
     </div>
-    
-    <div class="action-buttons">
-      <button class="btn reset-btn" id="reset-btn">
-        🔄 Reset Hari Ini
-      </button>
-      <button class="btn info-btn" id="info-btn">
-        ℹ️ Informasi
-      </button>
-    </div>
-    
-    <div class="footer-note">
-      <p><strong>Keterangan:</strong></p>
-      <p>• <span class="letter-a">A</span>: Umum | <span class="letter-b">B</span>: Anak | <span class="letter-c">C</span>: Gigi | <span class="letter-d">D</span>: KIA | <span class="letter-e">E</span>: Lansia</p>
-      <p>• Antrian E: total = online + loket</p>
-      <p>• Antrian A–D: hanya loket (mulai dari nomor 1)</p>
-    </div>
+    <button class="reset-btn" id="reset-btn">Reset Hari Ini</button>
+    <div class="footer">E: total = online + loket. A–D: hanya loket (mulai dari 1).</div>
   </div>
 
-  <!-- Tab 2: Pendaftaran & Panggilan -->
   <div id="tab2" class="tab-content">
-    <h2>📢 Pendaftaran – Panggil Antrian</h2>
-    
+    <h2>Pendaftaran – Panggil Antrian</h2>
     <div class="call-container">
-      <div id="call-A" class="call-box">
-        <div class="call-header">
-          <span class="letter-icon">A</span>
-          <span class="counter-type">Umum</span>
-        </div>
-        <div class="call-body" id="call-body-A">
-          <!-- Akan diisi oleh JavaScript -->
-        </div>
-      </div>
-      
-      <div id="call-B" class="call-box">
-        <div class="call-header">
-          <span class="letter-icon">B</span>
-          <span class="counter-type">Anak</span>
-        </div>
-        <div class="call-body" id="call-body-B">
-          <!-- Akan diisi oleh JavaScript -->
-        </div>
-      </div>
-      
-      <div id="call-C" class="call-box">
-        <div class="call-header">
-          <span class="letter-icon">C</span>
-          <span class="counter-type">Gigi</span>
-        </div>
-        <div class="call-body" id="call-body-C">
-          <!-- Akan diisi oleh JavaScript -->
-        </div>
-      </div>
-      
-      <div id="call-D" class="call-box">
-        <div class="call-header">
-          <span class="letter-icon">D</span>
-          <span class="counter-type">KIA</span>
-        </div>
-        <div class="call-body" id="call-body-D">
-          <!-- Akan diisi oleh JavaScript -->
-        </div>
-      </div>
-      
-      <div id="call-E" class="call-box">
-        <div class="call-header">
-          <span class="letter-icon">E</span>
-          <span class="counter-type">Lansia</span>
-          <span class="online-badge" id="online-badge">Online: 0</span>
-        </div>
-        <div class="call-body" id="call-body-E">
-          <!-- Akan diisi oleh JavaScript -->
-        </div>
-      </div>
+      <div id="call-A" class="call-box"></div>
+      <div id="call-B" class="call-box"></div>
+      <div id="call-C" class="call-box"></div>
+      <div id="call-D" class="call-box"></div>
+      <div id="call-E" class="call-box"></div>
     </div>
-    
-    <div class="instructions">
-      <h3>📋 Petunjuk Penggunaan:</h3>
-      <ol>
-        <li>Klik <strong>"Panggil"</strong> pada antrian yang tersedia</li>
-        <li>Pasien akan mendengar suara panggilan</li>
-        <li>Konfirmasi status pasien: <strong>"Hadir"</strong> atau <strong>"Tidak Hadir"</strong></li>
-        <li>Pasien yang tidak hadir akan masuk ke daftar <strong>"Panggil Ulang"</strong></li>
-        <li>Gunakan tombol <strong>"Panggil Ulang"</strong> untuk memanggil kembali</li>
-      </ol>
-    </div>
-    
-    <div class="current-call-display" id="current-call-display">
-      <!-- Menampilkan panggilan saat ini -->
-    </div>
+    <div class="footer">Klik "Panggil" → lalu konfirmasi "Hadir" atau "Tidak Hadir"</div>
   </div>
 
-  <!-- Modal Informasi -->
-  <div id="info-modal" class="modal">
-    <div class="modal-content">
-      <span class="close-modal">&times;</span>
-      <h2>ℹ️ Informasi Sistem Antrian</h2>
-      <div class="modal-body">
-        <h3>Fitur Sistem:</h3>
-        <ul>
-          <li><strong>Pembagian Antrian:</strong> Atur jumlah antrian per kategori</li>
-          <li><strong>Antrian Online:</strong> Khusus kategori E (Lansia) bisa online</li>
-          <li><strong>Panggilan:</strong> Sistem panggilan dengan suara</li>
-          <li><strong>Recall:</strong> Panggil ulang pasien yang tidak hadir</li>
-          <li><strong>Reset Otomatis:</strong> Reset setiap hari baru</li>
-          <li><strong>Cloud Sync:</strong> Data tersimpan di Firebase (real-time)</li>
-        </ul>
-        
-        <h3>Kategori Antrian:</h3>
-        <table class="info-table">
-          <tr>
-            <th>Kode</th>
-            <th>Kategori</th>
-            <th>Deskripsi</th>
-          </tr>
-          <tr>
-            <td><span class="letter-a">A</span></td>
-            <td>Umum</td>
-            <td>Pelayanan umum untuk semua usia</td>
-          </tr>
-          <tr>
-            <td><span class="letter-b">B</span></td>
-            <td>Anak</td>
-            <td>Pelayanan kesehatan anak</td>
-          </tr>
-          <tr>
-            <td><span class="letter-c">C</span></td>
-            <td>Gigi</td>
-            <td>Pelayanan kesehatan gigi dan mulut</td>
-          </tr>
-          <tr>
-            <td><span class="letter-d">D</span></td>
-            <td>KIA</td>
-            <td>Kesehatan Ibu dan Anak</td>
-          </tr>
-          <tr>
-            <td><span class="letter-e">E</span></td>
-            <td>Lansia</td>
-            <td>Pelayanan khusus lanjut usia</td>
-          </tr>
-        </table>
-        
-        <div class="modal-footer">
-          <p><strong>Versi:</strong> 2.0 | <strong>Update:</strong> Desember 2024</p>
-          <p>Sistem dikembangkan untuk Puskesmas Kedawung dengan teknologi modern</p>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Scripts -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-  <script src="firebase-config.js"></script>
-  <script src="app.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyASLzAtjOgYI2Otko1vMD2Lie8_h3GCUsc",
+      authDomain: "antrian-puskesmas-5869a.firebaseapp.com",
+      databaseURL: "https://antrian-puskesmas-5869a-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "antrian-puskesmas-5869a",
+      storageBucket: "antrian-puskesmas-5869a.firebasestorage.app",
+      messagingSenderId: "992002959684",
+      appId: "1:992002959684:web:ec82ecb075c71927504f11"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    const ref = database.ref('antrian_hari_ini');
+
+    // Variable global untuk menyimpan state panggilan
+    let currentCall = {
+      letter: null,
+      number: null,
+      isRecall: false
+    };
+
+    function playBeep() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.value = 800;
+        gain.gain.value = 0.1;
+        osc.start();
+        setTimeout(() => {
+          osc.stop();
+          ctx.close();
+        }, 200);
+      } catch (e) {
+        console.warn("Gagal memutar suara:", e);
+      }
+    }
+
+    function isSameDay(timestamp) {
+      const now = new Date();
+      const stored = new Date(timestamp);
+      return now.getFullYear() === stored.getFullYear() &&
+             now.getMonth() === stored.getMonth() &&
+             now.getDate() === stored.getDate();
+    }
+
+    function resetAll() {
+      const resetData = {};
+      ['A','B','C','D'].forEach(letter => {
+        resetData[letter] = { start: 1, total: 0, next: 1, recall: [] };
+      });
+      resetData.E = { start: 1, total: 0, next: 1, recall: [], online: 0 };
+      resetData.lastReset = Date.now();
+      ref.set(resetData);
+    }
+
+    function checkAndResetIfNeeded() {
+      ref.once('value').then(snapshot => {
+        const data = snapshot.val() || {};
+        const lastReset = data.lastReset || 0;
+        if (!isSameDay(lastReset)) {
+          resetAll();
+        }
+      });
+    }
+    checkAndResetIfNeeded();
+
+    // Tab navigation
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.getAttribute('data-tab')).classList.add('active');
+      });
+    });
+
+    // Counter untuk A-D
+    ['A','B','C','D'].forEach(letter => {
+      document.querySelectorAll(`[data-letter="${letter}"]`).forEach(btn => {
+        btn.addEventListener('click', () => {
+          const el = document.getElementById(`total-${letter}`);
+          let val = parseInt(el.textContent) || 0;
+          if (btn.classList.contains('btn-plus')) val++;
+          else if (btn.classList.contains('btn-minus') && val > 0) val--;
+          el.textContent = val;
+          ref.child(letter).update({ total: val, start: 1 });
+          if (val === 0) {
+            ref.child(letter).update({ next: 1, recall: [] });
+          }
+        });
+      });
+    });
+
+    // Counter untuk E
+    const onlineE = document.getElementById('online-E');
+    const totalE = document.getElementById('total-E');
+
+    function updateE() {
+      const loket = parseInt(totalE.textContent) || 0;
+      const online = parseInt(onlineE.value) || 0;
+      const start = online + 1;
+      const total = online + loket;
+      ref.child('E').set({
+        online: online,
+        start: start,
+        total: total,
+        next: start,
+        recall: [],
+        loket: loket
+      });
+    }
+
+    document.querySelectorAll('[data-letter="E"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        let loket = parseInt(totalE.textContent) || 0;
+        if (btn.classList.contains('btn-plus')) loket++;
+        else if (btn.classList.contains('btn-minus') && loket > 0) loket--;
+        totalE.textContent = loket;
+        updateE();
+      });
+    });
+
+    onlineE.addEventListener('input', () => {
+      updateE();
+    });
+
+    // Fungsi untuk menampilkan kotak konfirmasi
+    function showConfirmBox(container, letter, number, isRecall) {
+      const confirmBoxId = `confirm-${letter}-${number}`;
+      
+      // Hapus confirm box yang sudah ada
+      const existingConfirm = document.getElementById(confirmBoxId);
+      if (existingConfirm) {
+        existingConfirm.remove();
+      }
+      
+      const confirmBox = document.createElement('div');
+      confirmBox.id = confirmBoxId;
+      confirmBox.className = 'confirm-box';
+      confirmBox.innerHTML = `
+        <div style="margin-bottom: 5px; font-weight: bold;">Konfirmasi ${letter}${number}:</div>
+        <button class="btn-confirm hadir" data-letter="${letter}" data-number="${number}" data-is-recall="${isRecall}">Hadir</button>
+        <button class="btn-confirm tidak-hadir" data-letter="${letter}" data-number="${number}" data-is-recall="${isRecall}">Tidak Hadir</button>
+        <button class="btn-cancel" style="margin-left: 5px; padding: 8px 12px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">Batal</button>
+      `;
+      
+      container.appendChild(confirmBox);
+      
+      // Event listener untuk tombol cancel
+      confirmBox.querySelector('.btn-cancel').addEventListener('click', () => {
+        confirmBox.remove();
+      });
+      
+      return confirmBox;
+    }
+
+    // Fungsi render dengan event delegation yang lebih baik
+    function renderLetter(letter, data) {
+      const container = document.getElementById(`call-${letter}`);
+      const start = data.start || 1;
+      const total = data.total || 0;
+      const next = data.next || start;
+      const recall = (data.recall || []).map(x => parseInt(x)).sort((a,b) => a - b);
+
+      // Kosongkan container
+      container.innerHTML = '';
+
+      if (total === 0 || (letter !== 'E' && total < start)) {
+        container.innerHTML = `<div class="call-header">${letter}: Tidak ada antrian</div>`;
+        return;
+      }
+
+      // Header
+      const header = document.createElement('div');
+      header.className = 'call-header';
+      header.textContent = `${letter}: ${total - (letter === 'E' ? data.online || 0 : 0)} antrian`;
+      container.appendChild(header);
+
+      // Tombol panggil untuk antrian normal
+      if (next <= total) {
+        const callInfo = document.createElement('div');
+        callInfo.className = 'call-info';
+        callInfo.textContent = `Panggil: ${letter}${next}`;
+        container.appendChild(callInfo);
+
+        const callBtn = document.createElement('button');
+        callBtn.className = 'btn-call';
+        callBtn.textContent = `Panggil ${letter}${next}`;
+        callBtn.dataset.letter = letter;
+        callBtn.dataset.number = next;
+        callBtn.dataset.isRecall = 'false';
+        container.appendChild(callBtn);
+
+        // Event listener untuk tombol panggil normal
+        callBtn.addEventListener('click', (e) => {
+          playBeep();
+          const letter = e.target.dataset.letter;
+          const number = parseInt(e.target.dataset.number);
+          const isRecall = e.target.dataset.isRecall === 'true';
+          showConfirmBox(container, letter, number, isRecall);
+        });
+      }
+
+      // Daftar recall
+      if (recall.length > 0) {
+        const recallInfo = document.createElement('div');
+        recallInfo.className = 'call-info';
+        recallInfo.style.color = '#d95345';
+        recallInfo.style.marginTop = '8px';
+        recallInfo.textContent = `Belum hadir: ${recall.map(n => letter + n).join(', ')}`;
+        container.appendChild(recallInfo);
+
+        const recallList = document.createElement('div');
+        recallList.className = 'recall-list';
+        container.appendChild(recallList);
+
+        recall.forEach(num => {
+          const recallItem = document.createElement('span');
+          recallItem.className = 'recall-item';
+          recallItem.innerHTML = `
+            ${letter}${num}
+            <button data-letter="${letter}" data-number="${num}">Panggil Ulang</button>
+          `;
+          recallList.appendChild(recallItem);
+
+          // Event listener untuk tombol panggil ulang
+          recallItem.querySelector('button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            playBeep();
+            const letter = e.target.dataset.letter;
+            const number = parseInt(e.target.dataset.number);
+            showConfirmBox(container, letter, number, true);
+          });
+        });
+      }
+
+      // Jika semua selesai
+      if (next > total && recall.length === 0) {
+        container.innerHTML = `<div class="call-header">${letter}: Semua selesai</div>`;
+      }
+    }
+
+    // Event delegation untuk tombol konfirmasi di tab2
+    document.getElementById('tab2').addEventListener('click', (e) => {
+      // Handle tombol hadir/tidak hadir
+      if (e.target.classList.contains('btn-confirm')) {
+        const letter = e.target.dataset.letter;
+        const number = parseInt(e.target.dataset.number);
+        const isRecall = e.target.dataset.isRecall === 'true';
+        const hadir = e.target.classList.contains('hadir');
+
+        const letterRef = ref.child(letter);
+        letterRef.once('value').then(snapshot => {
+          const data = snapshot.val() || {};
+          const recall = (data.recall || []).map(x => parseInt(x));
+          const start = data.start || 1;
+          let next = data.next || start;
+
+          if (hadir) {
+            const newRecall = recall.filter(n => n !== number);
+            if (isRecall) {
+              letterRef.update({ recall: newRecall });
+            } else {
+              letterRef.update({ next: next + 1, recall: newRecall });
+            }
+          } else {
+            let newRecall = [...recall];
+            if (!newRecall.includes(number)) {
+              newRecall.push(number);
+            }
+            if (isRecall) {
+              letterRef.update({ recall: newRecall });
+            } else {
+              letterRef.update({ next: next + 1, recall: newRecall });
+            }
+          }
+          
+          // Hapus confirm box setelah konfirmasi
+          const confirmBox = document.getElementById(`confirm-${letter}-${number}`);
+          if (confirmBox) {
+            confirmBox.remove();
+          }
+        });
+      }
+    });
+
+    // Reset button
+    document.getElementById('reset-btn').addEventListener('click', () => {
+      if (confirm('Yakin reset semua antrian hari ini?')) {
+        resetAll();
+      }
+    });
+
+    // Firebase listener
+    ref.on('value', snapshot => {
+      const data = snapshot.val() || {};
+      ['A','B','C','D'].forEach(letter => {
+        const total = (data[letter]?.total) || 0;
+        document.getElementById(`total-${letter}`).textContent = total;
+        renderLetter(letter, data[letter] || {});
+      });
+      const eData = data.E || {};
+      const eTotal = eData.loket || 0;
+      totalE.textContent = eTotal;
+      onlineE.value = eData.online || 0;
+      renderLetter('E', eData);
+    });
+  </script>
 </body>
 </html>
