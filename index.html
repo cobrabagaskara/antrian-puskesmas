@@ -44,6 +44,7 @@
       align-items: center;
       gap: 10px;
       margin: 10px 0;
+      flex-wrap: wrap;
     }
     .counter-label {
       font-weight: bold;
@@ -78,6 +79,20 @@
     }
     .btn-plus:hover { background: #218838; }
     .btn-minus:hover { background: #c82333; }
+
+    /* Input khusus untuk online E */
+    .online-input {
+      width: 70px;
+      padding: 6px;
+      font-size: 1em;
+      text-align: center;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .online-label {
+      font-size: 0.9em;
+      color: #666;
+    }
 
     /* Pendaftaran */
     .call-row {
@@ -172,9 +187,13 @@
       <span class="counter-value" id="total-E">0</span>
       <button class="btn-plus" data-letter="E">+</button>
       <button class="btn-minus" data-letter="E">-</button>
+      <div style="margin-left: 10px;">
+        <div class="online-label">Online:</div>
+        <input type="number" class="online-input" id="online-E" min="0" value="0" placeholder="0">
+      </div>
     </div>
     <button class="reset-btn" id="reset-btn">Reset Hari Ini</button>
-    <div class="footer">Total antrian yang dibagikan (misal: A=7 → antrian A1 sampai A7)</div>
+    <div class="footer">Untuk E: total = online + loket. A–D hanya loket.</div>
   </div>
 
   <!-- Tab 2: Pemanggilan Per Nomor -->
@@ -193,7 +212,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
   <script>
-    // 🔑 Konfigurasi Firebase (dari kamu)
+    // 🔑 Konfigurasi Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyASLzAtjOgYI2Otko1vMD2Lie8_h3GCUsc",
       authDomain: "antrian-puskesmas-5869a.firebaseapp.com",
@@ -208,23 +227,22 @@
     const database = firebase.database();
     const ref = database.ref('antrian_hari_ini');
 
-    // === NOTIFIKASI SUARA ===
+    // === SUARA (beep) ===
     function playBeep() {
       try {
-        // Gunakan Web Audio API untuk suara pendek
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.type = 'sine';
-        osc.frequency.value = 800; // frekuensi tinggi (nyaring tapi tidak menyakitkan)
-        gain.gain.value = 0.1;     // volume rendah
+        osc.frequency.value = 800;
+        gain.gain.value = 0.1;
         osc.start();
         setTimeout(() => {
           osc.stop();
-          ctx.close(); // bebaskan sumber daya
-        }, 200); // durasi: 200ms
+          ctx.close();
+        }, 200);
       } catch (e) {
         console.warn("Gagal memutar suara:", e);
       }
@@ -245,9 +263,11 @@
         const lastReset = data.lastReset || 0;
         if (!isSameDay(lastReset)) {
           const resetData = {};
-          ['A','B','C','D','E'].forEach(letter => {
+          ['A','B','C','D'].forEach(letter => {
             resetData[letter] = { total: 0, current: 0 };
           });
+          // E punya field 'online'
+          resetData.E = { total: 0, current: 0, online: 0 };
           resetData.lastReset = Date.now();
           ref.set(resetData);
         }
@@ -265,17 +285,45 @@
       });
     });
 
-    // === PEMBAGIAN ANTRIAN (UPDATE TOTAL) ===
-    document.querySelectorAll('.btn-plus, .btn-minus').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const letter = btn.getAttribute('data-letter');
-        const el = document.getElementById(`total-${letter}`);
-        let val = parseInt(el.textContent) || 0;
-        if (btn.classList.contains('btn-plus')) val++;
-        else if (btn.classList.contains('btn-minus') && val > 0) val--;
-        el.textContent = val;
-        ref.child(`${letter}/total`).set(val);
+    // === UPDATE TOTAL (A-D) ===
+    ['A','B','C','D'].forEach(letter => {
+      document.querySelectorAll(`[data-letter="${letter}"]`).forEach(btn => {
+        btn.addEventListener('click', () => {
+          const el = document.getElementById(`total-${letter}`);
+          let val = parseInt(el.textContent) || 0;
+          if (btn.classList.contains('btn-plus')) val++;
+          else if (btn.classList.contains('btn-minus') && val > 0) val--;
+          el.textContent = val;
+          ref.child(`${letter}/total`).set(val);
+        });
       });
+    });
+
+    // === UPDATE UNTUK E (LOKET + ONLINE) ===
+    const onlineE = document.getElementById('online-E');
+    const totalE = document.getElementById('total-E');
+
+    function updateTotalE() {
+      const loket = parseInt(totalE.textContent) || 0;
+      const online = parseInt(onlineE.value) || 0;
+      const total = online + loket;
+      ref.child('E').set({ total, current: 0, online });
+    }
+
+    // Tombol +/– untuk E (atur loket)
+    document.querySelectorAll('[data-letter="E"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        let loket = parseInt(totalE.textContent) || 0;
+        if (btn.classList.contains('btn-plus')) loket++;
+        else if (btn.classList.contains('btn-minus') && loket > 0) loket--;
+        totalE.textContent = loket;
+        updateTotalE();
+      });
+    });
+
+    // Input online berubah
+    onlineE.addEventListener('input', () => {
+      updateTotalE();
     });
 
     // === PENDAFTARAN: RENDER TAMPILAN ===
@@ -308,7 +356,6 @@
         ref.child(`${letter}/current`).transaction(current => {
           return (current || 0) + 1;
         });
-        // 🔊 PUTAR SUARA!
         playBeep();
       }
     });
@@ -317,9 +364,10 @@
     document.getElementById('reset-btn').addEventListener('click', () => {
       if (confirm('Yakin reset semua antrian hari ini?')) {
         const resetData = {};
-        ['A','B','C','D','E'].forEach(letter => {
+        ['A','B','C','D'].forEach(letter => {
           resetData[letter] = { total: 0, current: 0 };
         });
+        resetData.E = { total: 0, current: 0, online: 0 };
         resetData.lastReset = Date.now();
         ref.set(resetData);
       }
@@ -328,14 +376,20 @@
     // === REAL-TIME UPDATE ===
     ref.on('value', snapshot => {
       const data = snapshot.val() || {};
-      ['A','B','C','D','E'].forEach(letter => {
-        const totalEl = document.getElementById(`total-${letter}`);
+      ['A','B','C','D'].forEach(letter => {
         const total = (data[letter]?.total) || 0;
         const current = (data[letter]?.current) || 0;
-
-        if (totalEl) totalEl.textContent = total;
+        document.getElementById(`total-${letter}`).textContent = total;
         renderCallSection(letter, total, current);
       });
+      // Untuk E
+      const eData = data.E || {};
+      const eTotal = eData.total || 0;
+      const eCurrent = eData.current || 0;
+      const eOnline = eData.online || 0;
+      totalE.textContent = eTotal - eOnline; // tampilkan hanya jumlah loket
+      onlineE.value = eOnline;
+      renderCallSection('E', eTotal, eCurrent);
     });
   </script>
 </body>
