@@ -121,6 +121,9 @@
       background: #007bff;
       color: white;
     }
+    .btn-call.recall {
+      background: #d9534f;
+    }
     .btn-confirm.hadir {
       background: #28a745;
       color: white;
@@ -134,6 +137,7 @@
       cursor: not-allowed;
     }
     .btn-call:hover:not(:disabled) { background: #0056b3; }
+    .btn-call.recall:hover:not(:disabled) { background: #c9302c; }
     .btn-confirm.hadir:hover:not(:disabled) { background: #218838; }
     .btn-confirm.tidak-hadir:hover:not(:disabled) { background: #c82333; }
 
@@ -363,87 +367,80 @@
         return;
       }
 
-      let callNumber, isRecall = false;
-      let content = '';
+      let content = `<div class="call-header">${letter}: ${total - (letter === 'E' ? data.online || 0 : 0)} antrian</div>`;
 
-      if (recall.length > 0) {
-        callNumber = recall[0];
-        isRecall = true;
-        content = `
-          <div class="call-header">${letter}: ${total - (letter === 'E' ? data.online || 0 : 0)} antrian</div>
-          <div class="call-info">Panggil ulang: ${letter}${callNumber}</div>
-          <button class="btn-call" data-letter="${letter}" data-number="${callNumber}" data-is-recall="true">Panggil Ulang ${letter}${callNumber}</button>
+      // Tampilkan tombol panggil berikutnya jika masih ada
+      if (next <= total) {
+        content += `
+          <div class="call-info">Panggil: ${letter}${next}</div>
+          <button class="btn-call" data-letter="${letter}" data-number="${next}" data-is-recall="false">Panggil ${letter}${next}</button>
         `;
-      } else if (next <= total) {
-        callNumber = next;
-        content = `
-          <div class="call-header">${letter}: ${total - (letter === 'E' ? data.online || 0 : 0)} antrian</div>
-          <div class="call-info">Panggil: ${letter}${callNumber}</div>
-          <button class="btn-call" data-letter="${letter}" data-number="${callNumber}" data-is-recall="false">Panggil ${letter}${callNumber}</button>
-        `;
-      } else {
-        content = `<div class="call-header">${letter}: Semua selesai</div>`;
       }
 
-      // Tampilkan daftar "Menunggu" DI SEMUA KASUS jika ada
+      // Tampilkan daftar yang belum hadir + tombol panggil ulang
       if (recall.length > 0) {
-        content += `<div class="recall-list">Menunggu: ${recall.map(n => letter + n).join(', ')}</div>`;
+        const firstRecall = recall[0];
+        content += `
+          <div class="call-info" style="color:#d95345; margin-top:8px;">Belum hadir: ${recall.map(n => letter + n).join(', ')}</div>
+          <button class="btn-call recall" data-letter="${letter}" data-number="${firstRecall}" data-is-recall="true">Panggil Ulang ${letter}${firstRecall}</button>
+        `;
+      }
+
+      if (next > total && recall.length === 0) {
+        content = `<div class="call-header">${letter}: Semua selesai</div>`;
       }
 
       container.innerHTML = content;
 
-      // Tambahkan handler klik untuk tombol panggil
-      const btn = container.querySelector('.btn-call');
-      if (btn) {
+      // Tambahkan handler untuk semua tombol panggil
+      container.querySelectorAll('.btn-call').forEach(btn => {
         btn.addEventListener('click', () => {
+          const number = parseInt(btn.getAttribute('data-number'));
+          const isRecall = btn.getAttribute('data-is-recall') === 'true';
           playBeep();
           container.innerHTML += `
             <div style="margin-top:10px;">
-              <button class="btn-confirm hadir" data-letter="${letter}" data-number="${callNumber}" data-is-recall="${isRecall}">${letter}${callNumber} Hadir</button>
-              <button class="btn-confirm tidak-hadir" data-letter="${letter}" data-number="${callNumber}" data-is-recall="${isRecall}">${letter}${callNumber} Tidak Hadir</button>
+              <button class="btn-confirm hadir" data-letter="${letter}" data-number="${number}" data-is-recall="${isRecall}">${letter}${number} Hadir</button>
+              <button class="btn-confirm tidak-hadir" data-letter="${letter}" data-number="${number}" data-is-recall="${isRecall}">${letter}${number} Tidak Hadir</button>
             </div>
           `;
         });
-      }
+      });
     }
 
-// === HANDLE KONFIRMASI ===
-document.getElementById('tab2').addEventListener('click', (e) => {
-  if (e.target.classList.contains('btn-confirm')) {
-    const letter = e.target.getAttribute('data-letter');
-    const number = parseInt(e.target.getAttribute('data-number'));
-    const isRecall = e.target.getAttribute('data-is-recall') === 'true';
-    const hadir = e.target.classList.contains('hadir');
+    // === HANDLE KONFIRMASI ===
+    document.getElementById('tab2').addEventListener('click', (e) => {
+      if (e.target.classList.contains('btn-confirm')) {
+        const letter = e.target.getAttribute('data-letter');
+        const number = parseInt(e.target.getAttribute('data-number'));
+        const isRecall = e.target.getAttribute('data-is-recall') === 'true';
+        const hadir = e.target.classList.contains('hadir');
 
-    const letterRef = ref.child(letter);
-    letterRef.once('value').then(snapshot => {
-      const data = snapshot.val() || {};
-      const recall = (data.recall || []).map(x => parseInt(x));
-      const start = data.start || 1;
-      let next = data.next || start;
+        const letterRef = ref.child(letter);
+        letterRef.once('value').then(snapshot => {
+          const data = snapshot.val() || {};
+          const recall = (data.recall || []).map(x => parseInt(x));
+          const start = data.start || 1;
+          let next = data.next || start;
 
-      if (hadir) {
-        // Hapus dari recall
-        const newRecall = recall.filter(n => n !== number);
-        if (isRecall) {
-          // Hanya update recall
-          letterRef.update({ recall: newRecall });
-        } else {
-          // Naikkan next dan update recall
-          letterRef.update({ next: next + 1, recall: newRecall });
-        }
-      } else {
-        // Tidak hadir: tambahkan ke recall (dengan array baru!)
-        let newRecall = [...recall];
-        if (!newRecall.includes(number)) {
-          newRecall = [...newRecall, number];
-        }
-        // Naikkan next agar bisa lanjut
-        letterRef.update({ next: next + 1, recall: newRecall });
+          if (hadir) {
+            const newRecall = recall.filter(n => n !== number);
+            if (isRecall) {
+              letterRef.update({ recall: newRecall });
+            } else {
+              letterRef.update({ next: next + 1, recall: newRecall });
+            }
+          } else {
+            let newRecall = [...recall];
+            if (!newRecall.includes(number)) {
+              newRecall = [...newRecall, number];
+            }
+            letterRef.update({ next: next + 1, recall: newRecall });
+          }
+        });
       }
     });
-  }
-});
+
     // === RESET MANUAL ===
     document.getElementById('reset-btn').addEventListener('click', () => {
       if (confirm('Yakin reset semua antrian hari ini?')) {
