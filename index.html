@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Antrian Puskesmas</title>
   <style>
+    /* CSS tetap sama seperti sebelumnya */
     body {
       font-family: Arial, sans-serif;
       max-width: 1000px;
@@ -192,6 +193,15 @@
       border: none;
       border-radius: 3px;
     }
+    
+    /* Tambahan untuk confirm box */
+    .confirm-box {
+      margin-top: 10px;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 5px;
+      border: 1px solid #dee2e6;
+    }
   </style>
 </head>
 <body>
@@ -252,7 +262,7 @@
       <div id="call-D" class="call-box"></div>
       <div id="call-E" class="call-box"></div>
     </div>
-    <div class="footer">Klik “Panggil” → lalu konfirmasi “Hadir” atau “Tidak Hadir”</div>
+    <div class="footer">Klik "Panggil" → lalu konfirmasi "Hadir" atau "Tidak Hadir"</div>
   </div>
 
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -272,6 +282,13 @@
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
     const ref = database.ref('antrian_hari_ini');
+
+    // Variable global untuk menyimpan state panggilan
+    let currentCall = {
+      letter: null,
+      number: null,
+      isRecall: false
+    };
 
     function playBeep() {
       try {
@@ -322,6 +339,7 @@
     }
     checkAndResetIfNeeded();
 
+    // Tab navigation
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -331,6 +349,7 @@
       });
     });
 
+    // Counter untuk A-D
     ['A','B','C','D'].forEach(letter => {
       document.querySelectorAll(`[data-letter="${letter}"]`).forEach(btn => {
         btn.addEventListener('click', () => {
@@ -347,6 +366,7 @@
       });
     });
 
+    // Counter untuk E
     const onlineE = document.getElementById('online-E');
     const totalE = document.getElementById('total-E');
 
@@ -379,6 +399,37 @@
       updateE();
     });
 
+    // Fungsi untuk menampilkan kotak konfirmasi
+    function showConfirmBox(container, letter, number, isRecall) {
+      const confirmBoxId = `confirm-${letter}-${number}`;
+      
+      // Hapus confirm box yang sudah ada
+      const existingConfirm = document.getElementById(confirmBoxId);
+      if (existingConfirm) {
+        existingConfirm.remove();
+      }
+      
+      const confirmBox = document.createElement('div');
+      confirmBox.id = confirmBoxId;
+      confirmBox.className = 'confirm-box';
+      confirmBox.innerHTML = `
+        <div style="margin-bottom: 5px; font-weight: bold;">Konfirmasi ${letter}${number}:</div>
+        <button class="btn-confirm hadir" data-letter="${letter}" data-number="${number}" data-is-recall="${isRecall}">Hadir</button>
+        <button class="btn-confirm tidak-hadir" data-letter="${letter}" data-number="${number}" data-is-recall="${isRecall}">Tidak Hadir</button>
+        <button class="btn-cancel" style="margin-left: 5px; padding: 8px 12px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">Batal</button>
+      `;
+      
+      container.appendChild(confirmBox);
+      
+      // Event listener untuk tombol cancel
+      confirmBox.querySelector('.btn-cancel').addEventListener('click', () => {
+        confirmBox.remove();
+      });
+      
+      return confirmBox;
+    }
+
+    // Fungsi render dengan event delegation yang lebih baik
     function renderLetter(letter, data) {
       const container = document.getElementById(`call-${letter}`);
       const start = data.start || 1;
@@ -386,77 +437,91 @@
       const next = data.next || start;
       const recall = (data.recall || []).map(x => parseInt(x)).sort((a,b) => a - b);
 
+      // Kosongkan container
+      container.innerHTML = '';
+
       if (total === 0 || (letter !== 'E' && total < start)) {
         container.innerHTML = `<div class="call-header">${letter}: Tidak ada antrian</div>`;
         return;
       }
 
-      let content = `<div class="call-header">${letter}: ${total - (letter === 'E' ? data.online || 0 : 0)} antrian</div>`;
+      // Header
+      const header = document.createElement('div');
+      header.className = 'call-header';
+      header.textContent = `${letter}: ${total - (letter === 'E' ? data.online || 0 : 0)} antrian`;
+      container.appendChild(header);
 
+      // Tombol panggil untuk antrian normal
       if (next <= total) {
-        content += `
-          <div class="call-info">Panggil: ${letter}${next}</div>
-          <button class="btn-call" data-letter="${letter}" data-number="${next}" data-is-recall="false">Panggil ${letter}${next}</button>
-        `;
+        const callInfo = document.createElement('div');
+        callInfo.className = 'call-info';
+        callInfo.textContent = `Panggil: ${letter}${next}`;
+        container.appendChild(callInfo);
+
+        const callBtn = document.createElement('button');
+        callBtn.className = 'btn-call';
+        callBtn.textContent = `Panggil ${letter}${next}`;
+        callBtn.dataset.letter = letter;
+        callBtn.dataset.number = next;
+        callBtn.dataset.isRecall = 'false';
+        container.appendChild(callBtn);
+
+        // Event listener untuk tombol panggil normal
+        callBtn.addEventListener('click', (e) => {
+          playBeep();
+          const letter = e.target.dataset.letter;
+          const number = parseInt(e.target.dataset.number);
+          const isRecall = e.target.dataset.isRecall === 'true';
+          showConfirmBox(container, letter, number, isRecall);
+        });
       }
 
+      // Daftar recall
       if (recall.length > 0) {
-        content += `
-          <div class="call-info" style="color:#d95345; margin-top:8px;">Belum hadir: ${recall.map(n => letter + n).join(', ')}</div>
-          <div class="recall-list">
-        `;
+        const recallInfo = document.createElement('div');
+        recallInfo.className = 'call-info';
+        recallInfo.style.color = '#d95345';
+        recallInfo.style.marginTop = '8px';
+        recallInfo.textContent = `Belum hadir: ${recall.map(n => letter + n).join(', ')}`;
+        container.appendChild(recallInfo);
+
+        const recallList = document.createElement('div');
+        recallList.className = 'recall-list';
+        container.appendChild(recallList);
+
         recall.forEach(num => {
-          content += `
-            <span class="recall-item">
-              ${letter}${num}
-              <button data-letter="${letter}" data-number="${num}" data-is-recall="true">Panggil Ulang</button>
-            </span>
+          const recallItem = document.createElement('span');
+          recallItem.className = 'recall-item';
+          recallItem.innerHTML = `
+            ${letter}${num}
+            <button data-letter="${letter}" data-number="${num}">Panggil Ulang</button>
           `;
+          recallList.appendChild(recallItem);
+
+          // Event listener untuk tombol panggil ulang
+          recallItem.querySelector('button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            playBeep();
+            const letter = e.target.dataset.letter;
+            const number = parseInt(e.target.dataset.number);
+            showConfirmBox(container, letter, number, true);
+          });
         });
-        content += `</div>`;
       }
 
+      // Jika semua selesai
       if (next > total && recall.length === 0) {
-        content = `<div class="call-header">${letter}: Semua selesai</div>`;
+        container.innerHTML = `<div class="call-header">${letter}: Semua selesai</div>`;
       }
-
-      container.innerHTML = content;
-
-      container.querySelectorAll('.btn-call').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const number = parseInt(btn.getAttribute('data-number'));
-          const isRecall = btn.getAttribute('data-is-recall') === 'true';
-          playBeep();
-          container.innerHTML += `
-            <div style="margin-top:10px;">
-              <button class="btn-confirm hadir" data-letter="${letter}" data-number="${number}" data-is-recall="${isRecall}">${letter}${number} Hadir</button>
-              <button class="btn-confirm tidak-hadir" data-letter="${letter}" data-number="${number}" data-is-recall="${isRecall}">${letter}${number} Tidak Hadir</button>
-            </div>
-          `;
-        });
-      });
-
-      container.querySelectorAll('.recall-item button').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const fullText = btn.closest('.recall-item').textContent;
-          const number = parseInt(fullText.match(/\d+/)[0]);
-          playBeep();
-          container.innerHTML += `
-            <div style="margin-top:10px;">
-              <button class="btn-confirm hadir" data-letter="${letter}" data-number="${number}" data-is-recall="true">${letter}${number} Hadir</button>
-              <button class="btn-confirm tidak-hadir" data-letter="${letter}" data-number="${number}" data-is-recall="true">${letter}${number} Tidak Hadir</button>
-            </div>
-          `;
-        });
-      });
     }
 
+    // Event delegation untuk tombol konfirmasi di tab2
     document.getElementById('tab2').addEventListener('click', (e) => {
+      // Handle tombol hadir/tidak hadir
       if (e.target.classList.contains('btn-confirm')) {
-        const letter = e.target.getAttribute('data-letter');
-        const number = parseInt(e.target.getAttribute('data-number'));
-        const isRecall = e.target.getAttribute('data-is-recall') === 'true';
+        const letter = e.target.dataset.letter;
+        const number = parseInt(e.target.dataset.number);
+        const isRecall = e.target.dataset.isRecall === 'true';
         const hadir = e.target.classList.contains('hadir');
 
         const letterRef = ref.child(letter);
@@ -476,7 +541,7 @@
           } else {
             let newRecall = [...recall];
             if (!newRecall.includes(number)) {
-              newRecall = [...newRecall, number];
+              newRecall.push(number);
             }
             if (isRecall) {
               letterRef.update({ recall: newRecall });
@@ -484,16 +549,24 @@
               letterRef.update({ next: next + 1, recall: newRecall });
             }
           }
+          
+          // Hapus confirm box setelah konfirmasi
+          const confirmBox = document.getElementById(`confirm-${letter}-${number}`);
+          if (confirmBox) {
+            confirmBox.remove();
+          }
         });
       }
     });
 
+    // Reset button
     document.getElementById('reset-btn').addEventListener('click', () => {
       if (confirm('Yakin reset semua antrian hari ini?')) {
         resetAll();
       }
     });
 
+    // Firebase listener
     ref.on('value', snapshot => {
       const data = snapshot.val() || {};
       ['A','B','C','D'].forEach(letter => {
