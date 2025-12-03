@@ -356,7 +356,7 @@
       });
     });
 
-    // === INPUT E ===
+    // === INPUT E (PERBAIKAN) ===
     const onlineE = document.getElementById('online-E');
     const totalE = document.getElementById('total-E');
 
@@ -365,12 +365,14 @@
       const online = parseInt(onlineE.value) || 0;
       const start = online + 1;
       const total = online + loket;
+      // Simpan data lengkap
       ref.child('E').set({
         online: online,
         start: start,
         total: total,
-        next: start, // ⚠️ Perbaikan: selalu mulai dari start
-        recall: []
+        next: start,
+        recall: [],
+        loket: loket
       });
     }
 
@@ -403,7 +405,6 @@
 
       let content = `<div class="call-header">${letter}: ${total - (letter === 'E' ? data.online || 0 : 0)} antrian</div>`;
 
-      // Tampilkan tombol panggil berikutnya jika masih ada
       if (next <= total) {
         content += `
           <div class="call-info">Panggil: ${letter}${next}</div>
@@ -411,7 +412,6 @@
         `;
       }
 
-      // Tampilkan daftar yang belum hadir + tombol panggil ulang
       if (recall.length > 0) {
         content += `
           <div class="call-info" style="color:#d95345; margin-top:8px;">Belum hadir: ${recall.map(n => letter + n).join(', ')}</div>
@@ -434,7 +434,7 @@
 
       container.innerHTML = content;
 
-      // Tambahkan handler untuk semua tombol panggil
+      // Handler tombol panggil utama
       container.querySelectorAll('.btn-call').forEach(btn => {
         btn.addEventListener('click', () => {
           const number = parseInt(btn.getAttribute('data-number'));
@@ -449,12 +449,11 @@
         });
       });
 
-      // Tambahkan handler untuk tombol "Panggil Ulang" di recall
+      // Handler tombol "Panggil Ulang" di daftar recall
       container.querySelectorAll('.recall-item button').forEach(btn => {
         btn.addEventListener('click', (e) => {
-          e.stopPropagation(); // Cegah trigger parent
-          const letter = btn.closest('.call-box').id.replace('call-', '');
-          const number = parseInt(btn.parentElement.textContent.replace(letter, ''));
+          e.stopPropagation();
+          const number = parseInt(btn.textContent.replace(/[^0-9]/g, ''));
           playBeep();
           container.innerHTML += `
             <div style="margin-top:10px;">
@@ -466,7 +465,7 @@
       });
     }
 
-    // === HANDLE KONFIRMASI ===
+    // === HANDLE KONFIRMASI (PERBAIKAN UTAMA) ===
     document.getElementById('tab2').addEventListener('click', (e) => {
       if (e.target.classList.contains('btn-confirm')) {
         const letter = e.target.getAttribute('data-letter');
@@ -493,7 +492,12 @@
             if (!newRecall.includes(number)) {
               newRecall = [...newRecall, number];
             }
-            letterRef.update({ next: next + 1, recall: newRecall });
+            // 🔥 PERBAIKAN: JANGAN NAIKKAN NEXT JIKA INI PANGGIL ULANG
+            if (isRecall) {
+              letterRef.update({ recall: newRecall });
+            } else {
+              letterRef.update({ next: next + 1, recall: newRecall });
+            }
           }
         });
       }
@@ -516,8 +520,8 @@
       });
       // E
       const eData = data.E || {};
-      const eTotal = (eData.total || 0) - (eData.online || 0);
-      totalE.textContent = Math.max(0, eTotal);
+      const eTotal = eData.loket || 0; // Tampilkan hanya jumlah loket
+      totalE.textContent = eTotal;
       onlineE.value = eData.online || 0;
       renderLetter('E', eData);
     });
