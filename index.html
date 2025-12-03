@@ -423,29 +423,27 @@ document.getElementById('tab2').addEventListener('click', (e) => {
       let next = data.next || start;
 
       if (hadir) {
+        // Hapus dari recall
         const newRecall = recall.filter(n => n !== number);
         if (isRecall) {
+          // Hanya update recall
           letterRef.update({ recall: newRecall });
         } else {
+          // Naikkan next dan update recall
           letterRef.update({ next: next + 1, recall: newRecall });
         }
       } else {
-        if (!recall.includes(number)) {
-          recall.push(number);
+        // Tidak hadir: tambahkan ke recall (dengan array baru!)
+        let newRecall = [...recall];
+        if (!newRecall.includes(number)) {
+          newRecall = [...newRecall, number];
         }
-        letterRef.update({ next: next + 1, recall: recall });
+        // Naikkan next agar bisa lanjut
+        letterRef.update({ next: next + 1, recall: newRecall });
       }
-
-      // ⚡ PAKSA RENDER ULANG SETELAH UPDATE
-      setTimeout(() => {
-        ref.child(letter).once('value').then(snap => {
-          renderLetter(letter, snap.val());
-        });
-      }, 100);
     });
   }
 });
-
     // === RESET MANUAL ===
     document.getElementById('reset-btn').addEventListener('click', () => {
       if (confirm('Yakin reset semua antrian hari ini?')) {
