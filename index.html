@@ -80,7 +80,6 @@
     .btn-plus:hover { background: #218838; }
     .btn-minus:hover { background: #c82333; }
 
-    /* Input khusus untuk online E */
     .online-input {
       width: 70px;
       padding: 6px;
@@ -94,7 +93,6 @@
       color: #666;
     }
 
-    /* Pendaftaran */
     .call-row {
       margin: 12px 0;
       padding: 12px;
@@ -111,22 +109,33 @@
       margin: 6px 0;
       font-size: 1em;
     }
-    .btn-call {
-      padding: 8px 16px;
-      background: #007bff;
-      color: white;
+    .btn-call, .btn-confirm {
+      padding: 8px 12px;
       border: none;
       border-radius: 5px;
       cursor: pointer;
-      font-size: 1.1em;
+      font-size: 1em;
+      margin: 4px 4px 4px 0;
     }
-    .btn-call:disabled {
+    .btn-call {
+      background: #007bff;
+      color: white;
+    }
+    .btn-confirm.hadir {
+      background: #28a745;
+      color: white;
+    }
+    .btn-confirm.tidak-hadir {
+      background: #dc3545;
+      color: white;
+    }
+    .btn-call:disabled, .btn-confirm:disabled {
       background: #ccc;
       cursor: not-allowed;
     }
-    .btn-call:hover:not(:disabled) {
-      background: #0056b3;
-    }
+    .btn-call:hover:not(:disabled) { background: #0056b3; }
+    .btn-confirm.hadir:hover:not(:disabled) { background: #218838; }
+    .btn-confirm.tidak-hadir:hover:not(:disabled) { background: #c82333; }
 
     button.reset-btn {
       padding: 10px 15px;
@@ -146,6 +155,11 @@
       font-size: 0.9em;
       color: #666;
     }
+    .recall-list {
+      font-size: 0.95em;
+      color: #d95345;
+      margin-top: 6px;
+    }
   </style>
 </head>
 <body>
@@ -155,7 +169,7 @@
     <button class="tab-btn" data-tab="tab2">Pendaftaran</button>
   </div>
 
-  <!-- Tab 1: Input Total Antrian -->
+  <!-- Tab 1: Input -->
   <div id="tab1" class="tab-content active">
     <h2>Pembagian Antrian (A–E)</h2>
     <div class="counter">
@@ -193,10 +207,10 @@
       </div>
     </div>
     <button class="reset-btn" id="reset-btn">Reset Hari Ini</button>
-    <div class="footer">Untuk E: total = online + loket. A–D hanya loket.</div>
+    <div class="footer">E: total = online + loket. A–D: hanya loket (mulai dari 1).</div>
   </div>
 
-  <!-- Tab 2: Pemanggilan Per Nomor -->
+  <!-- Tab 2: Pemanggilan -->
   <div id="tab2" class="tab-content">
     <h2>Pendaftaran – Panggil Antrian</h2>
     <div id="call-A" class="call-row"></div>
@@ -204,7 +218,7 @@
     <div id="call-C" class="call-row"></div>
     <div id="call-D" class="call-row"></div>
     <div id="call-E" class="call-row"></div>
-    <div class="footer">Klik “Panggil” untuk lanjut ke nomor berikutnya</div>
+    <div class="footer">Klik “Panggil” → lalu konfirmasi “Hadir” atau “Tidak Hadir”</div>
   </div>
 
   <!-- Firebase SDK -->
@@ -212,7 +226,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
   <script>
-    // 🔑 Konfigurasi Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyASLzAtjOgYI2Otko1vMD2Lie8_h3GCUsc",
       authDomain: "antrian-puskesmas-5869a.firebaseapp.com",
@@ -227,7 +240,7 @@
     const database = firebase.database();
     const ref = database.ref('antrian_hari_ini');
 
-    // === SUARA (beep) ===
+    // === SUARA ===
     function playBeep() {
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -248,7 +261,7 @@
       }
     }
 
-    // === RESET HARIAN ===
+    // === RESET ===
     function isSameDay(timestamp) {
       const now = new Date();
       const stored = new Date(timestamp);
@@ -257,25 +270,28 @@
              now.getDate() === stored.getDate();
     }
 
+    function resetAll() {
+      const resetData = {};
+      ['A','B','C','D'].forEach(letter => {
+        resetData[letter] = { start: 1, total: 0, next: 1, recall: [] };
+      });
+      resetData.E = { start: 1, total: 0, next: 1, recall: [], online: 0 };
+      resetData.lastReset = Date.now();
+      ref.set(resetData);
+    }
+
     function checkAndResetIfNeeded() {
       ref.once('value').then(snapshot => {
         const data = snapshot.val() || {};
         const lastReset = data.lastReset || 0;
         if (!isSameDay(lastReset)) {
-          const resetData = {};
-          ['A','B','C','D'].forEach(letter => {
-            resetData[letter] = { total: 0, current: 0 };
-          });
-          // E punya field 'online'
-          resetData.E = { total: 0, current: 0, online: 0 };
-          resetData.lastReset = Date.now();
-          ref.set(resetData);
+          resetAll();
         }
       });
     }
     checkAndResetIfNeeded();
 
-    // === TAB SWITCHING ===
+    // === TAB ===
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -285,7 +301,7 @@
       });
     });
 
-    // === UPDATE TOTAL (A-D) ===
+    // === INPUT A-D ===
     ['A','B','C','D'].forEach(letter => {
       document.querySelectorAll(`[data-letter="${letter}"]`).forEach(btn => {
         btn.addEventListener('click', () => {
@@ -294,102 +310,153 @@
           if (btn.classList.contains('btn-plus')) val++;
           else if (btn.classList.contains('btn-minus') && val > 0) val--;
           el.textContent = val;
-          ref.child(`${letter}/total`).set(val);
+          ref.child(letter).update({ total: val, start: 1 });
+          // Jika total berubah, reset next & recall
+          if (val === 0) {
+            ref.child(letter).update({ next: 1, recall: [] });
+          }
         });
       });
     });
 
-    // === UPDATE UNTUK E (LOKET + ONLINE) ===
+    // === INPUT E ===
     const onlineE = document.getElementById('online-E');
     const totalE = document.getElementById('total-E');
 
-    function updateTotalE() {
+    function updateE() {
       const loket = parseInt(totalE.textContent) || 0;
       const online = parseInt(onlineE.value) || 0;
+      const start = online + 1;
       const total = online + loket;
-      ref.child('E').set({ total, current: 0, online });
+      ref.child('E').set({
+        online: online,
+        start: start,
+        total: total,
+        next: loket > 0 ? start : 1,
+        recall: []
+      });
     }
 
-    // Tombol +/– untuk E (atur loket)
     document.querySelectorAll('[data-letter="E"]').forEach(btn => {
       btn.addEventListener('click', () => {
         let loket = parseInt(totalE.textContent) || 0;
         if (btn.classList.contains('btn-plus')) loket++;
         else if (btn.classList.contains('btn-minus') && loket > 0) loket--;
         totalE.textContent = loket;
-        updateTotalE();
+        updateE();
       });
     });
 
-    // Input online berubah
     onlineE.addEventListener('input', () => {
-      updateTotalE();
+      updateE();
     });
 
-    // === PENDAFTARAN: RENDER TAMPILAN ===
-    function renderCallSection(letter, total, current) {
+    // === RENDER SEMUA HURUF ===
+    function renderLetter(letter, data) {
       const container = document.getElementById(`call-${letter}`);
-      let html = '';
-      if (total === 0) {
-        html = `<div class="call-header">${letter}: Tidak ada antrian</div>`;
-      } else {
-        const next = current + 1;
-        const status = current === 0 ? 
-          `Belum mulai` : 
-          `Terakhir dipanggil: ${letter}${current}`;
-        const nextText = next <= total ? `Panggil ${letter}${next}` : "Selesai";
-        const disabled = next > total ? 'disabled' : '';
-        
-        html = `
-          <div class="call-header">${letter}: ${total} antrian (1–${total})</div>
-          <div class="call-info">${status}</div>
-          <button class="btn-call" data-letter="${letter}" ${disabled}>${nextText}</button>
-        `;
+      const start = data.start || 1;
+      const total = data.total || 0;
+      const next = data.next || start;
+      const recall = (data.recall || []).map(x => parseInt(x)).sort((a,b) => a - b);
+
+      if (total === 0 || (letter !== 'E' && total < start)) {
+        container.innerHTML = `<div class="call-header">${letter}: Tidak ada antrian</div>`;
+        return;
       }
-      container.innerHTML = html;
+
+      let callNumber, isRecall = false;
+      if (recall.length > 0) {
+        callNumber = recall[0];
+        isRecall = true;
+        container.innerHTML = `
+          <div class="call-header">${letter}: ${total - (letter === 'E' ? data.online || 0 : 0)} antrian</div>
+          <div class="call-info">Panggil ulang: ${letter}${callNumber}</div>
+          <button class="btn-call" data-letter="${letter}" data-number="${callNumber}" data-is-recall="true">Panggil Ulang ${letter}${callNumber}</button>
+          <div class="recall-list">Menunggu: ${recall.map(n => letter + n).join(', ')}</div>
+        `;
+      } else if (next <= total) {
+        callNumber = next;
+        container.innerHTML = `
+          <div class="call-header">${letter}: ${total - (letter === 'E' ? data.online || 0 : 0)} antrian</div>
+          <div class="call-info">Panggil: ${letter}${callNumber}</div>
+          <button class="btn-call" data-letter="${letter}" data-number="${callNumber}" data-is-recall="false">Panggil ${letter}${callNumber}</button>
+        `;
+      } else {
+        container.innerHTML = `<div class="call-header">${letter}: Semua selesai</div>`;
+        if (recall.length > 0) {
+          container.innerHTML += `<div class="recall-list">Tapi ada yang belum hadir: ${recall.map(n => letter + n).join(', ')}</div>`;
+        }
+        return;
+      }
+
+      // Tambahkan handler untuk tombol panggil
+      const btn = container.querySelector('.btn-call');
+      if (btn) {
+        btn.addEventListener('click', () => {
+          playBeep();
+          container.innerHTML += `
+            <div style="margin-top:10px;">
+              <button class="btn-confirm hadir" data-letter="${letter}" data-number="${callNumber}" data-is-recall="${isRecall}">${letter}${callNumber} Hadir</button>
+              <button class="btn-confirm tidak-hadir" data-letter="${letter}" data-number="${callNumber}" data-is-recall="${isRecall}">${letter}${callNumber} Tidak Hadir</button>
+            </div>
+          `;
+        });
+      }
     }
 
-    // === TOMBOL "PANGGIL" + SUARA ===
+    // === HANDLE KONFIRMASI ===
     document.getElementById('tab2').addEventListener('click', (e) => {
-      if (e.target.classList.contains('btn-call')) {
+      if (e.target.classList.contains('btn-confirm')) {
         const letter = e.target.getAttribute('data-letter');
-        ref.child(`${letter}/current`).transaction(current => {
-          return (current || 0) + 1;
+        const number = parseInt(e.target.getAttribute('data-number'));
+        const isRecall = e.target.getAttribute('data-is-recall') === 'true';
+        const hadir = e.target.classList.contains('hadir');
+
+        const letterRef = ref.child(letter);
+        letterRef.once('value').then(snapshot => {
+          const data = snapshot.val() || {};
+          const recall = (data.recall || []).map(x => parseInt(x));
+          const start = data.start || 1;
+          let next = data.next || start;
+
+          if (hadir) {
+            const newRecall = recall.filter(n => n !== number);
+            if (isRecall) {
+              letterRef.update({ recall: newRecall });
+            } else {
+              letterRef.update({ next: next + 1, recall: newRecall });
+            }
+          } else {
+            if (!recall.includes(number)) {
+              recall.push(number);
+            }
+            letterRef.update({ recall: recall });
+          }
         });
-        playBeep();
       }
     });
 
     // === RESET MANUAL ===
     document.getElementById('reset-btn').addEventListener('click', () => {
       if (confirm('Yakin reset semua antrian hari ini?')) {
-        const resetData = {};
-        ['A','B','C','D'].forEach(letter => {
-          resetData[letter] = { total: 0, current: 0 };
-        });
-        resetData.E = { total: 0, current: 0, online: 0 };
-        resetData.lastReset = Date.now();
-        ref.set(resetData);
+        resetAll();
       }
     });
 
-    // === REAL-TIME UPDATE ===
+    // === REAL-TIME ===
     ref.on('value', snapshot => {
       const data = snapshot.val() || {};
       ['A','B','C','D'].forEach(letter => {
         const total = (data[letter]?.total) || 0;
-        const current = (data[letter]?.current) || 0;
         document.getElementById(`total-${letter}`).textContent = total;
-        renderCallSection(letter, total, current);
+        renderLetter(letter, data[letter] || {});
       });
-      // Untuk E
+      // E
       const eData = data.E || {};
-      const eTotal = eData.total || 0;
-      const eCurrent = eData.current || 0;
-      const eOnline = eData.online || 0;
-      totalE.textContent = eTotal - eOnline; // tampilkan hanya jumlah loket
-      onlineE.value = eOnline;
-      renderCallSection('E', eTotal, eCurrent);
+      const eTotal = (eData.total || 0) - (eData.online || 0);
+      totalE.textContent = Math.max(0, eTotal);
+      onlineE.value = eData.online || 0;
+      renderLetter('E', eData);
     });
   </script>
 </body>
