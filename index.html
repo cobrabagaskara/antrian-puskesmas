@@ -40,7 +40,6 @@
       display: block;
     }
 
-    /* Tab 1: Pembagian Antrian */
     .counter-group {
       display: flex;
       gap: 20px;
@@ -118,7 +117,6 @@
       color: #666;
     }
 
-    /* Tab 2: Pendaftaran */
     .call-container {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -203,7 +201,6 @@
     <button class="tab-btn" data-tab="tab2">Pendaftaran</button>
   </div>
 
-  <!-- Tab 1: Input -->
   <div id="tab1" class="tab-content active">
     <h2>Pembagian Antrian (A–E)</h2>
     <div class="counter-group">
@@ -246,7 +243,6 @@
     <div class="footer">E: total = online + loket. A–D: hanya loket (mulai dari 1).</div>
   </div>
 
-  <!-- Tab 2: Pemanggilan -->
   <div id="tab2" class="tab-content">
     <h2>Pendaftaran – Panggil Antrian</h2>
     <div class="call-container">
@@ -259,7 +255,6 @@
     <div class="footer">Klik “Panggil” → lalu konfirmasi “Hadir” atau “Tidak Hadir”</div>
   </div>
 
-  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
@@ -278,7 +273,6 @@
     const database = firebase.database();
     const ref = database.ref('antrian_hari_ini');
 
-    // === SUARA ===
     function playBeep() {
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -299,7 +293,6 @@
       }
     }
 
-    // === RESET ===
     function isSameDay(timestamp) {
       const now = new Date();
       const stored = new Date(timestamp);
@@ -329,7 +322,7 @@
     }
     checkAndResetIfNeeded();
 
-    // === TAB ===
+    // Tab switching
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -339,7 +332,7 @@
       });
     });
 
-    // === INPUT A-D ===
+    // A-D input
     ['A','B','C','D'].forEach(letter => {
       document.querySelectorAll(`[data-letter="${letter}"]`).forEach(btn => {
         btn.addEventListener('click', () => {
@@ -356,7 +349,7 @@
       });
     });
 
-    // === INPUT E (PERBAIKAN) ===
+    // E input (PERBAIKAN UTAMA)
     const onlineE = document.getElementById('online-E');
     const totalE = document.getElementById('total-E');
 
@@ -365,7 +358,6 @@
       const online = parseInt(onlineE.value) || 0;
       const start = online + 1;
       const total = online + loket;
-      // Simpan data lengkap
       ref.child('E').set({
         online: online,
         start: start,
@@ -390,7 +382,7 @@
       updateE();
     });
 
-    // === RENDER SEMUA HURUF ===
+    // Render
     function renderLetter(letter, data) {
       const container = document.getElementById(`call-${letter}`);
       const start = data.start || 1;
@@ -434,7 +426,7 @@
 
       container.innerHTML = content;
 
-      // Handler tombol panggil utama
+      // Main call button
       container.querySelectorAll('.btn-call').forEach(btn => {
         btn.addEventListener('click', () => {
           const number = parseInt(btn.getAttribute('data-number'));
@@ -449,11 +441,11 @@
         });
       });
 
-      // Handler tombol "Panggil Ulang" di daftar recall
+      // Recall button
       container.querySelectorAll('.recall-item button').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
-          const number = parseInt(btn.textContent.replace(/[^0-9]/g, ''));
+          const number = parseInt(btn.closest('.recall-item').textContent.replace(/[^0-9]/g, ''));
           playBeep();
           container.innerHTML += `
             <div style="margin-top:10px;">
@@ -465,7 +457,7 @@
       });
     }
 
-    // === HANDLE KONFIRMASI (PERBAIKAN UTAMA) ===
+    // Handle confirmation (PERBAIKAN KUNCI)
     document.getElementById('tab2').addEventListener('click', (e) => {
       if (e.target.classList.contains('btn-confirm')) {
         const letter = e.target.getAttribute('data-letter');
@@ -492,7 +484,7 @@
             if (!newRecall.includes(number)) {
               newRecall = [...newRecall, number];
             }
-            // 🔥 PERBAIKAN: JANGAN NAIKKAN NEXT JIKA INI PANGGIL ULANG
+            // 🔥 JANGAN NAIKKAN NEXT JIKA INI PANGGIL ULANG
             if (isRecall) {
               letterRef.update({ recall: newRecall });
             } else {
@@ -503,14 +495,14 @@
       }
     });
 
-    // === RESET MANUAL ===
+    // Reset
     document.getElementById('reset-btn').addEventListener('click', () => {
       if (confirm('Yakin reset semua antrian hari ini?')) {
         resetAll();
       }
     });
 
-    // === REAL-TIME ===
+    // Real-time
     ref.on('value', snapshot => {
       const data = snapshot.val() || {};
       ['A','B','C','D'].forEach(letter => {
@@ -520,7 +512,7 @@
       });
       // E
       const eData = data.E || {};
-      const eTotal = eData.loket || 0; // Tampilkan hanya jumlah loket
+      const eTotal = eData.loket || 0;
       totalE.textContent = eTotal;
       onlineE.value = eData.online || 0;
       renderLetter('E', eData);
