@@ -419,19 +419,27 @@
           let next = data.next || start;
 
           if (hadir) {
-            const newRecall = recall.filter(n => n !== number);
-            if (isRecall) {
-              letterRef.update({ recall: newRecall });
-            } else {
-              letterRef.update({ next: next + 1, recall: newRecall });
-            }
-          } else {
-            let newRecall = [...recall];
-            if (!newRecall.includes(number)) {
-              newRecall = [...newRecall, number];
-            }
-            letterRef.update({ next: next + 1, recall: newRecall });
-          }
+  const newRecall = recall.filter(n => n !== number);
+  if (isRecall) {
+    // Jika ini panggil ulang → tidak naikkan next
+    letterRef.update({ recall: newRecall });
+  } else {
+    // Jika ini nomor baru → naikkan next
+    letterRef.update({ next: next + 1, recall: newRecall });
+  }
+} else {
+  let newRecall = [...recall];
+  if (!newRecall.includes(number)) {
+    newRecall = [...newRecall, number];
+  }
+  if (isRecall) {
+    // Jika ini panggil ulang → jangan naikkan next
+    letterRef.update({ recall: newRecall });
+  } else {
+    // Jika ini nomor baru → naikkan next
+    letterRef.update({ next: next + 1, recall: newRecall });
+  }
+}
         });
       }
     });
