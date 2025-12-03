@@ -311,7 +311,6 @@
           else if (btn.classList.contains('btn-minus') && val > 0) val--;
           el.textContent = val;
           ref.child(letter).update({ total: val, start: 1 });
-          // Jika total berubah, reset next & recall
           if (val === 0) {
             ref.child(letter).update({ next: 1, recall: [] });
           }
@@ -351,93 +350,95 @@
       updateE();
     });
 
-  // === RENDER SEMUA HURUF ===
-function renderLetter(letter, data) {
-  const container = document.getElementById(`call-${letter}`);
-  const start = data.start || 1;
-  const total = data.total || 0;
-  const next = data.next || start;
-  const recall = (data.recall || []).map(x => parseInt(x)).sort((a,b) => a - b);
-
-  if (total === 0 || (letter !== 'E' && total < start)) {
-    container.innerHTML = `<div class="call-header">${letter}: Tidak ada antrian</div>`;
-    return;
-  }
-
-  let callNumber, isRecall = false;
-  if (recall.length > 0) {
-    callNumber = recall[0];
-    isRecall = true;
-    container.innerHTML = `
-      <div class="call-header">${letter}: ${total - (letter === 'E' ? data.online || 0 : 0)} antrian</div>
-      <div class="call-info">Panggil ulang: ${letter}${callNumber}</div>
-      <button class="btn-call" data-letter="${letter}" data-number="${callNumber}" data-is-recall="true">Panggil Ulang ${letter}${callNumber}</button>
-      <div class="recall-list">Menunggu: ${recall.map(n => letter + n).join(', ')}</div>
-    `;
-  } else if (next <= total) {
-    callNumber = next;
-    container.innerHTML = `
-      <div class="call-header">${letter}: ${total - (letter === 'E' ? data.online || 0 : 0)} antrian</div>
-      <div class="call-info">Panggil: ${letter}${callNumber}</div>
-      <button class="btn-call" data-letter="${letter}" data-number="${callNumber}" data-is-recall="false">Panggil ${letter}${callNumber}</button>
-    `;
-  } else {
-    container.innerHTML = `<div class="call-header">${letter}: Semua selesai</div>`;
-    if (recall.length > 0) {
-      container.innerHTML += `<div class="recall-list">Tapi ada yang belum hadir: ${recall.map(n => letter + n).join(', ')}</div>`;
-    }
-    return;
-  }
-
-  // Tambahkan handler untuk tombol panggil
-  const btn = container.querySelector('.btn-call');
-  if (btn) {
-    btn.addEventListener('click', () => {
-      playBeep();
-      container.innerHTML += `
-        <div style="margin-top:10px;">
-          <button class="btn-confirm hadir" data-letter="${letter}" data-number="${callNumber}" data-is-recall="${isRecall}">${letter}${callNumber} Hadir</button>
-          <button class="btn-confirm tidak-hadir" data-letter="${letter}" data-number="${callNumber}" data-is-recall="${isRecall}">${letter}${callNumber} Tidak Hadir</button>
-        </div>
-      `;
-    });
-  }
-}
-
-// === HANDLE KONFIRMASI ===
-document.getElementById('tab2').addEventListener('click', (e) => {
-  if (e.target.classList.contains('btn-confirm')) {
-    const letter = e.target.getAttribute('data-letter');
-    const number = parseInt(e.target.getAttribute('data-number'));
-    const isRecall = e.target.getAttribute('data-is-recall') === 'true';
-    const hadir = e.target.classList.contains('hadir');
-
-    const letterRef = ref.child(letter);
-    letterRef.once('value').then(snapshot => {
-      const data = snapshot.val() || {};
-      const recall = (data.recall || []).map(x => parseInt(x));
+    // === RENDER SEMUA HURUF (FINAL) ===
+    function renderLetter(letter, data) {
+      const container = document.getElementById(`call-${letter}`);
       const start = data.start || 1;
-      let next = data.next || start;
+      const total = data.total || 0;
+      const next = data.next || start;
+      const recall = (data.recall || []).map(x => parseInt(x)).sort((a,b) => a - b);
 
-      if (hadir) {
-        // Jika hadir, hapus dari recall dan naikkan next
-        const newRecall = recall.filter(n => n !== number);
-        if (isRecall) {
-          letterRef.update({ recall: newRecall });
-        } else {
-          letterRef.update({ next: next + 1, recall: newRecall });
-        }
+      if (total === 0 || (letter !== 'E' && total < start)) {
+        container.innerHTML = `<div class="call-header">${letter}: Tidak ada antrian</div>`;
+        return;
+      }
+
+      let callNumber, isRecall = false;
+      let content = '';
+
+      if (recall.length > 0) {
+        callNumber = recall[0];
+        isRecall = true;
+        content = `
+          <div class="call-header">${letter}: ${total - (letter === 'E' ? data.online || 0 : 0)} antrian</div>
+          <div class="call-info">Panggil ulang: ${letter}${callNumber}</div>
+          <button class="btn-call" data-letter="${letter}" data-number="${callNumber}" data-is-recall="true">Panggil Ulang ${letter}${callNumber}</button>
+        `;
+      } else if (next <= total) {
+        callNumber = next;
+        content = `
+          <div class="call-header">${letter}: ${total - (letter === 'E' ? data.online || 0 : 0)} antrian</div>
+          <div class="call-info">Panggil: ${letter}${callNumber}</div>
+          <button class="btn-call" data-letter="${letter}" data-number="${callNumber}" data-is-recall="false">Panggil ${letter}${callNumber}</button>
+        `;
       } else {
-        // Jika tidak hadir, tambahkan ke recall — TAPI tetap naikkan next!
-        if (!recall.includes(number)) {
-          recall.push(number);
-        }
-        // Naikkan next agar bisa lanjut ke berikutnya
-        letterRef.update({ next: next + 1, recall: recall });
+        content = `<div class="call-header">${letter}: Semua selesai</div>`;
+      }
+
+      // Tampilkan daftar "Menunggu" DI SEMUA KASUS jika ada
+      if (recall.length > 0) {
+        content += `<div class="recall-list">Menunggu: ${recall.map(n => letter + n).join(', ')}</div>`;
+      }
+
+      container.innerHTML = content;
+
+      // Tambahkan handler klik untuk tombol panggil
+      const btn = container.querySelector('.btn-call');
+      if (btn) {
+        btn.addEventListener('click', () => {
+          playBeep();
+          container.innerHTML += `
+            <div style="margin-top:10px;">
+              <button class="btn-confirm hadir" data-letter="${letter}" data-number="${callNumber}" data-is-recall="${isRecall}">${letter}${callNumber} Hadir</button>
+              <button class="btn-confirm tidak-hadir" data-letter="${letter}" data-number="${callNumber}" data-is-recall="${isRecall}">${letter}${callNumber} Tidak Hadir</button>
+            </div>
+          `;
+        });
+      }
+    }
+
+    // === HANDLE KONFIRMASI ===
+    document.getElementById('tab2').addEventListener('click', (e) => {
+      if (e.target.classList.contains('btn-confirm')) {
+        const letter = e.target.getAttribute('data-letter');
+        const number = parseInt(e.target.getAttribute('data-number'));
+        const isRecall = e.target.getAttribute('data-is-recall') === 'true';
+        const hadir = e.target.classList.contains('hadir');
+
+        const letterRef = ref.child(letter);
+        letterRef.once('value').then(snapshot => {
+          const data = snapshot.val() || {};
+          const recall = (data.recall || []).map(x => parseInt(x));
+          const start = data.start || 1;
+          let next = data.next || start;
+
+          if (hadir) {
+            const newRecall = recall.filter(n => n !== number);
+            if (isRecall) {
+              letterRef.update({ recall: newRecall });
+            } else {
+              letterRef.update({ next: next + 1, recall: newRecall });
+            }
+          } else {
+            if (!recall.includes(number)) {
+              recall.push(number);
+            }
+            // Naikkan next agar bisa lanjut ke berikutnya
+            letterRef.update({ next: next + 1, recall: recall });
+          }
+        });
       }
     });
-  }
-});
 
     // === RESET MANUAL ===
     document.getElementById('reset-btn').addEventListener('click', () => {
