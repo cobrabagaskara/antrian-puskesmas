@@ -203,16 +203,11 @@
       border: 1px solid #dee2e6;
     }
 
-    /* Tambahan untuk counter E yang diperbaiki */
+    /* Tambahan untuk counter E */
     .counter-e-total {
       font-size: 0.9em;
       color: #666;
       margin-left: 5px;
-    }
-    .counter-e-breakdown {
-      font-size: 0.8em;
-      color: #888;
-      margin-top: 2px;
     }
   </style>
 </head>
@@ -259,7 +254,6 @@
           <div class="online-label">Online:</div>
           <input type="number" class="online-input" id="online-E" min="0" value="0" placeholder="0">
         </div>
-        <!-- Tambahan untuk menampilkan total -->
         <div class="counter-e-total" id="total-E-display">Total: 0</div>
       </div>
     </div>
@@ -296,6 +290,13 @@
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
     const ref = database.ref('antrian_hari_ini');
+
+    // VARIABEL GLOBAL untuk menyimpan state E
+    let stateE = {
+      online: 0,
+      loket: 0,
+      total: 0
+    };
 
     function playBeep() {
       try {
@@ -373,78 +374,67 @@
       });
     });
 
-    // Counter untuk E - DIPERBAIKI
+    // COUNTER E - LOGIKA BARU YANG LEBIH SIMPLE
     const onlineE = document.getElementById('online-E');
-    const totalECounter = document.getElementById('total-E'); // Counter angka besar
-    const totalEDisplay = document.getElementById('total-E-display'); // Teks "Total: X"
+    const totalECounter = document.getElementById('total-E'); // Counter besar
+    const totalEDisplay = document.getElementById('total-E-display'); // Teks detail
 
-    function updateE() {
-      const loket = parseInt(totalECounter.textContent) || 0;
-      const online = parseInt(onlineE.value) || 0;
-      const start = online + 1;
-      const total = online + loket;
+    // Fungsi utama update data E ke Firebase
+    function updateEToFirebase() {
+      const start = stateE.online + 1;
+      const total = stateE.online + stateE.loket;
       
-      // PERUBAHAN PENTING: Simpan LOKET, bukan TOTAL
       ref.child('E').once('value').then(snapshot => {
         const currentData = snapshot.val() || {};
         let next = currentData.next || start;
         
         // Logika next
-        if (next > total) {
-          if (total > next) {
-            next = next;
-          }
-        }
-        
-        if (next < start) {
+        if (next > total && total <= currentData.total) {
+          // Jika semua selesai dan ada penambahan antrian baru
+          next = next;
+        } else if (next < start) {
           next = start;
         }
         
-        // Update Firebase - simpan loket sebagai nilai terpisah
+        // Update Firebase
         ref.child('E').update({
-          online: online,
+          online: stateE.online,
+          loket: stateE.loket,
           start: start,
-          total: total,       // total = online + loket
-          loket: loket,       // simpan nilai loket terpisah
+          total: total,
           next: next
         });
-        
-        // Update tampilan counter E
-        totalECounter.textContent = total; // Tampilkan TOTAL, bukan hanya loket
-        totalEDisplay.textContent = `Total: ${total} (Online: ${online} + Loket: ${loket})`;
       });
     }
 
-    // Event untuk tombol + dan - E
+    // Fungsi update tampilan counter E
+    function updateEView() {
+      totalECounter.textContent = stateE.loket; // Tampilkan LOKET saja
+      totalEDisplay.textContent = `Total: ${stateE.online + stateE.loket} (Online: ${stateE.online} + Loket: ${stateE.loket})`;
+    }
+
+    // Event untuk tombol +/- E (mengontrol LOKET)
     document.querySelectorAll('[data-letter="E"]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const currentTotal = parseInt(totalECounter.textContent) || 0;
-        const online = parseInt(onlineE.value) || 0;
-        let loket = currentTotal - online; // Hitung loket dari total
-        
         if (btn.classList.contains('btn-plus')) {
-          loket++;
-        } else if (btn.classList.contains('btn-minus') && loket > 0) {
-          loket--;
+          stateE.loket++;
+        } else if (btn.classList.contains('btn-minus') && stateE.loket > 0) {
+          stateE.loket--;
         }
         
-        // Update counter dengan total baru
-        totalECounter.textContent = online + loket;
-        updateE();
+        updateEView();
+        updateEToFirebase();
       });
     });
 
+    // Event untuk input online (mengontrol ONLINE)
     onlineE.addEventListener('input', () => {
-      const currentTotal = parseInt(totalECounter.textContent) || 0;
-      const online = parseInt(onlineE.value) || 0;
-      const loket = currentTotal - online;
-      
-      // Jika online lebih besar dari total, atur loket minimal 0
-      if (loket < 0) {
-        totalECounter.textContent = online;
+      const onlineValue = parseInt(onlineE.value) || 0;
+      if (onlineValue >= 0) {
+        stateE.online = onlineValue;
+        updateEView();
+        updateEToFirebase();
       }
-      
-      updateE();
     });
 
     // Fungsi untuk menampilkan kotak konfirmasi
@@ -618,7 +608,7 @@
       }
     });
 
-    // Firebase listener - DIPERBAIKI
+    // Firebase listener
     ref.on('value', snapshot => {
       const data = snapshot.val() || {};
       
@@ -629,16 +619,17 @@
         renderLetter(letter, data[letter] || {});
       });
       
-      // Update counter E - LOGIKA BARU
+      // Update counter E
       const eData = data.E || {};
-      const online = eData.online || 0;
-      const loket = eData.loket || 0;
-      const totalEValue = online + loket;
       
-      // Update semua tampilan counter E
-      totalECounter.textContent = totalEValue; // Tampilkan TOTAL
-      onlineE.value = online;
-      totalEDisplay.textContent = `Total: ${totalEValue} (Online: ${online} + Loket: ${loket})`;
+      // Update state global
+      stateE.online = eData.online || 0;
+      stateE.loket = eData.loket || 0;
+      
+      // Update tampilan
+      totalECounter.textContent = stateE.loket; // Tampilkan LOKET
+      onlineE.value = stateE.online;
+      totalEDisplay.textContent = `Total: ${stateE.online + stateE.loket} (Online: ${stateE.online} + Loket: ${stateE.loket})`;
       
       renderLetter('E', eData);
     });
