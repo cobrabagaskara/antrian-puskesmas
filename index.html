@@ -407,38 +407,44 @@
       }
     }
 
-    // === HANDLE KONFIRMASI ===
-    document.getElementById('tab2').addEventListener('click', (e) => {
-      if (e.target.classList.contains('btn-confirm')) {
-        const letter = e.target.getAttribute('data-letter');
-        const number = parseInt(e.target.getAttribute('data-number'));
-        const isRecall = e.target.getAttribute('data-is-recall') === 'true';
-        const hadir = e.target.classList.contains('hadir');
+// === HANDLE KONFIRMASI ===
+document.getElementById('tab2').addEventListener('click', (e) => {
+  if (e.target.classList.contains('btn-confirm')) {
+    const letter = e.target.getAttribute('data-letter');
+    const number = parseInt(e.target.getAttribute('data-number'));
+    const isRecall = e.target.getAttribute('data-is-recall') === 'true';
+    const hadir = e.target.classList.contains('hadir');
 
-        const letterRef = ref.child(letter);
-        letterRef.once('value').then(snapshot => {
-          const data = snapshot.val() || {};
-          const recall = (data.recall || []).map(x => parseInt(x));
-          const start = data.start || 1;
-          let next = data.next || start;
+    const letterRef = ref.child(letter);
+    letterRef.once('value').then(snapshot => {
+      const data = snapshot.val() || {};
+      const recall = (data.recall || []).map(x => parseInt(x));
+      const start = data.start || 1;
+      let next = data.next || start;
 
-          if (hadir) {
-            const newRecall = recall.filter(n => n !== number);
-            if (isRecall) {
-              letterRef.update({ recall: newRecall });
-            } else {
-              letterRef.update({ next: next + 1, recall: newRecall });
-            }
-          } else {
-            if (!recall.includes(number)) {
-              recall.push(number);
-            }
-            // Naikkan next agar bisa lanjut ke berikutnya
-            letterRef.update({ next: next + 1, recall: recall });
-          }
-        });
+      if (hadir) {
+        const newRecall = recall.filter(n => n !== number);
+        if (isRecall) {
+          letterRef.update({ recall: newRecall });
+        } else {
+          letterRef.update({ next: next + 1, recall: newRecall });
+        }
+      } else {
+        if (!recall.includes(number)) {
+          recall.push(number);
+        }
+        letterRef.update({ next: next + 1, recall: recall });
       }
+
+      // ⚡ PAKSA RENDER ULANG SETELAH UPDATE
+      setTimeout(() => {
+        ref.child(letter).once('value').then(snap => {
+          renderLetter(letter, snap.val());
+        });
+      }, 100);
     });
+  }
+});
 
     // === RESET MANUAL ===
     document.getElementById('reset-btn').addEventListener('click', () => {
