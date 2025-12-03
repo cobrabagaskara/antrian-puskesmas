@@ -322,7 +322,6 @@
     }
     checkAndResetIfNeeded();
 
-    // Tab switching
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -332,7 +331,6 @@
       });
     });
 
-    // A-D input
     ['A','B','C','D'].forEach(letter => {
       document.querySelectorAll(`[data-letter="${letter}"]`).forEach(btn => {
         btn.addEventListener('click', () => {
@@ -349,7 +347,6 @@
       });
     });
 
-    // E input (PERBAIKAN UTAMA)
     const onlineE = document.getElementById('online-E');
     const totalE = document.getElementById('total-E');
 
@@ -382,7 +379,6 @@
       updateE();
     });
 
-    // Render
     function renderLetter(letter, data) {
       const container = document.getElementById(`call-${letter}`);
       const start = data.start || 1;
@@ -426,7 +422,6 @@
 
       container.innerHTML = content;
 
-      // Main call button
       container.querySelectorAll('.btn-call').forEach(btn => {
         btn.addEventListener('click', () => {
           const number = parseInt(btn.getAttribute('data-number'));
@@ -434,30 +429,29 @@
           playBeep();
           container.innerHTML += `
             <div style="margin-top:10px;">
-    <button class="btn-confirm hadir" data-letter="${letter}" data-number="${number}" data-is-recall="${isRecall}">${letter}${number} Hadir</button>
-    <button class="btn-confirm tidak-hadir" data-letter="${letter}" data-number="${number}" data-is-recall="${isRecall}">${letter}${number} Tidak Hadir</button>
-  </div>
+              <button class="btn-confirm hadir" data-letter="${letter}" data-number="${number}" data-is-recall="${isRecall}">${letter}${number} Hadir</button>
+              <button class="btn-confirm tidak-hadir" data-letter="${letter}" data-number="${number}" data-is-recall="${isRecall}">${letter}${number} Tidak Hadir</button>
+            </div>
           `;
         });
       });
 
-      // Recall button
       container.querySelectorAll('.recall-item button').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
-          const number = parseInt(btn.closest('.recall-item').textContent.replace(/[^0-9]/g, ''));
+          const fullText = btn.closest('.recall-item').textContent;
+          const number = parseInt(fullText.match(/\d+/)[0]);
           playBeep();
           container.innerHTML += `
             <div style="margin-top:10px;">
-    <button class="btn-confirm hadir" data-letter="${letter}" data-number="${number}" data-is-recall="${isRecall}">${letter}${number} Hadir</button>
-    <button class="btn-confirm tidak-hadir" data-letter="${letter}" data-number="${number}" data-is-recall="${isRecall}">${letter}${number} Tidak Hadir</button>
-  </div>
+              <button class="btn-confirm hadir" data-letter="${letter}" data-number="${number}" data-is-recall="true">${letter}${number} Hadir</button>
+              <button class="btn-confirm tidak-hadir" data-letter="${letter}" data-number="${number}" data-is-recall="true">${letter}${number} Tidak Hadir</button>
+            </div>
           `;
         });
       });
     }
 
-    // Handle confirmation (PERBAIKAN KUNCI)
     document.getElementById('tab2').addEventListener('click', (e) => {
       if (e.target.classList.contains('btn-confirm')) {
         const letter = e.target.getAttribute('data-letter');
@@ -484,7 +478,6 @@
             if (!newRecall.includes(number)) {
               newRecall = [...newRecall, number];
             }
-            // 🔥 JANGAN NAIKKAN NEXT JIKA INI PANGGIL ULANG
             if (isRecall) {
               letterRef.update({ recall: newRecall });
             } else {
@@ -495,14 +488,12 @@
       }
     });
 
-    // Reset
     document.getElementById('reset-btn').addEventListener('click', () => {
       if (confirm('Yakin reset semua antrian hari ini?')) {
         resetAll();
       }
     });
 
-    // Real-time
     ref.on('value', snapshot => {
       const data = snapshot.val() || {};
       ['A','B','C','D'].forEach(letter => {
@@ -510,7 +501,6 @@
         document.getElementById(`total-${letter}`).textContent = total;
         renderLetter(letter, data[letter] || {});
       });
-      // E
       const eData = data.E || {};
       const eTotal = eData.loket || 0;
       totalE.textContent = eTotal;
