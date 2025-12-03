@@ -202,6 +202,18 @@
       border-radius: 5px;
       border: 1px solid #dee2e6;
     }
+
+    /* Tambahan untuk counter E yang diperbaiki */
+    .counter-e-total {
+      font-size: 0.9em;
+      color: #666;
+      margin-left: 5px;
+    }
+    .counter-e-breakdown {
+      font-size: 0.8em;
+      color: #888;
+      margin-top: 2px;
+    }
   </style>
 </head>
 <body>
@@ -247,6 +259,8 @@
           <div class="online-label">Online:</div>
           <input type="number" class="online-input" id="online-E" min="0" value="0" placeholder="0">
         </div>
+        <!-- Tambahan untuk menampilkan total -->
+        <div class="counter-e-total" id="total-E-display">Total: 0</div>
       </div>
     </div>
     <button class="reset-btn" id="reset-btn">Reset Hari Ini</button>
@@ -282,13 +296,6 @@
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
     const ref = database.ref('antrian_hari_ini');
-
-    // Variable global untuk menyimpan state panggilan
-    let currentCall = {
-      letter: null,
-      number: null,
-      isRecall: false
-    };
 
     function playBeep() {
       try {
@@ -366,59 +373,77 @@
       });
     });
 
-    // Counter untuk E - FIXED
+    // Counter untuk E - DIPERBAIKI
     const onlineE = document.getElementById('online-E');
-    const totalE = document.getElementById('total-E');
+    const totalECounter = document.getElementById('total-E'); // Counter angka besar
+    const totalEDisplay = document.getElementById('total-E-display'); // Teks "Total: X"
 
     function updateE() {
-      const loket = parseInt(totalE.textContent) || 0;
+      const loket = parseInt(totalECounter.textContent) || 0;
       const online = parseInt(onlineE.value) || 0;
       const start = online + 1;
       const total = online + loket;
       
-      // Ambil data E saat ini untuk menentukan next yang benar
+      // PERUBAHAN PENTING: Simpan LOKET, bukan TOTAL
       ref.child('E').once('value').then(snapshot => {
         const currentData = snapshot.val() || {};
         let next = currentData.next || start;
         
-        // Logika penting: jangan reset next jika semua sudah selesai tapi ada penambahan antrian baru
+        // Logika next
         if (next > total) {
-          // Jika next melebihi total (semua selesai) tapi ada penambahan antrian baru
-          // next tetap next yang lama (jangan reset ke start)
-          // Kecuali jika total baru lebih besar dari next lama
           if (total > next) {
-            next = next; // Pertahankan next yang ada
+            next = next;
           }
         }
         
-        // Pastikan next tidak kurang dari start
         if (next < start) {
           next = start;
         }
         
-        // Update ke Firebase
+        // Update Firebase - simpan loket sebagai nilai terpisah
         ref.child('E').update({
           online: online,
           start: start,
-          total: total,
-          loket: loket,
-          // Jangan update next kalau tidak perlu, biarkan sesuai logika di atas
-          // recall tetap dipertahankan
+          total: total,       // total = online + loket
+          loket: loket,       // simpan nilai loket terpisah
+          next: next
         });
+        
+        // Update tampilan counter E
+        totalECounter.textContent = total; // Tampilkan TOTAL, bukan hanya loket
+        totalEDisplay.textContent = `Total: ${total} (Online: ${online} + Loket: ${loket})`;
       });
     }
 
+    // Event untuk tombol + dan - E
     document.querySelectorAll('[data-letter="E"]').forEach(btn => {
       btn.addEventListener('click', () => {
-        let loket = parseInt(totalE.textContent) || 0;
-        if (btn.classList.contains('btn-plus')) loket++;
-        else if (btn.classList.contains('btn-minus') && loket > 0) loket--;
-        totalE.textContent = loket;
+        const currentTotal = parseInt(totalECounter.textContent) || 0;
+        const online = parseInt(onlineE.value) || 0;
+        let loket = currentTotal - online; // Hitung loket dari total
+        
+        if (btn.classList.contains('btn-plus')) {
+          loket++;
+        } else if (btn.classList.contains('btn-minus') && loket > 0) {
+          loket--;
+        }
+        
+        // Update counter dengan total baru
+        totalECounter.textContent = online + loket;
         updateE();
       });
     });
 
     onlineE.addEventListener('input', () => {
+      const currentTotal = parseInt(totalECounter.textContent) || 0;
+      const online = parseInt(onlineE.value) || 0;
+      const loket = currentTotal - online;
+      
+      // Jika online lebih besar dari total, atur loket minimal 0
+      if (loket < 0) {
+        totalECounter.textContent = online;
+      }
+      
       updateE();
     });
 
@@ -426,7 +451,6 @@
     function showConfirmBox(container, letter, number, isRecall) {
       const confirmBoxId = `confirm-${letter}-${number}`;
       
-      // Hapus confirm box yang sudah ada
       const existingConfirm = document.getElementById(confirmBoxId);
       if (existingConfirm) {
         existingConfirm.remove();
@@ -444,7 +468,6 @@
       
       container.appendChild(confirmBox);
       
-      // Event listener untuk tombol cancel
       confirmBox.querySelector('.btn-cancel').addEventListener('click', () => {
         confirmBox.remove();
       });
@@ -452,7 +475,7 @@
       return confirmBox;
     }
 
-    // Fungsi render dengan perbaikan untuk E
+    // Fungsi render
     function renderLetter(letter, data) {
       const container = document.getElementById(`call-${letter}`);
       const start = data.start || 1;
@@ -460,7 +483,6 @@
       let next = data.next || start;
       const recall = (data.recall || []).map(x => parseInt(x)).sort((a,b) => a - b);
 
-      // Kosongkan container
       container.innerHTML = '';
 
       if (total === 0) {
@@ -468,7 +490,7 @@
         return;
       }
 
-      // Header khusus untuk E
+      // Header
       const header = document.createElement('div');
       header.className = 'call-header';
       if (letter === 'E') {
@@ -478,13 +500,11 @@
       }
       container.appendChild(header);
 
-      // Pastikan next tidak kurang dari start
       if (next < start) {
         next = start;
         ref.child(letter).update({ next: next });
       }
 
-      // Jika semua selesai (next > total dan recall kosong)
       if (next > total && recall.length === 0) {
         container.innerHTML = `
           <div class="call-header">${letter}: Semua selesai</div>
@@ -494,7 +514,6 @@
         return;
       }
 
-      // Tombol panggil untuk antrian normal
       if (next <= total) {
         const callInfo = document.createElement('div');
         callInfo.className = 'call-info';
@@ -509,7 +528,6 @@
         callBtn.dataset.isRecall = 'false';
         container.appendChild(callBtn);
 
-        // Event listener untuk tombol panggil normal
         callBtn.addEventListener('click', (e) => {
           playBeep();
           const letter = e.target.dataset.letter;
@@ -519,7 +537,6 @@
         });
       }
 
-      // Daftar recall
       if (recall.length > 0) {
         const recallInfo = document.createElement('div');
         recallInfo.className = 'call-info';
@@ -541,7 +558,6 @@
           `;
           recallList.appendChild(recallItem);
 
-          // Event listener untuk tombol panggil ulang
           recallItem.querySelector('button').addEventListener('click', (e) => {
             e.stopPropagation();
             playBeep();
@@ -553,9 +569,8 @@
       }
     }
 
-    // Event delegation untuk tombol konfirmasi di tab2
+    // Event delegation untuk tombol konfirmasi
     document.getElementById('tab2').addEventListener('click', (e) => {
-      // Handle tombol hadir/tidak hadir
       if (e.target.classList.contains('btn-confirm')) {
         const letter = e.target.dataset.letter;
         const number = parseInt(e.target.dataset.number);
@@ -588,7 +603,6 @@
             }
           }
           
-          // Hapus confirm box setelah konfirmasi
           const confirmBox = document.getElementById(`confirm-${letter}-${number}`);
           if (confirmBox) {
             confirmBox.remove();
@@ -604,7 +618,7 @@
       }
     });
 
-    // Firebase listener dengan perbaikan
+    // Firebase listener - DIPERBAIKI
     ref.on('value', snapshot => {
       const data = snapshot.val() || {};
       
@@ -615,11 +629,17 @@
         renderLetter(letter, data[letter] || {});
       });
       
-      // Update counter E dengan logika khusus
+      // Update counter E - LOGIKA BARU
       const eData = data.E || {};
-      const eTotalLoket = eData.loket || 0;
-      totalE.textContent = eTotalLoket;
-      onlineE.value = eData.online || 0;
+      const online = eData.online || 0;
+      const loket = eData.loket || 0;
+      const totalEValue = online + loket;
+      
+      // Update semua tampilan counter E
+      totalECounter.textContent = totalEValue; // Tampilkan TOTAL
+      onlineE.value = online;
+      totalEDisplay.textContent = `Total: ${totalEValue} (Online: ${online} + Loket: ${loket})`;
+      
       renderLetter('E', eData);
     });
   </script>
